@@ -1,37 +1,112 @@
 * {
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
 body {
-  margin: 0;
   font-family: Arial, sans-serif;
-  background: #10172a;
-  color: #ffffff;
+  background: #f4f5fb;
+  color: #172033;
 }
 
-h1 {
-  color: #a78bfa;
+.dashboard {
+  max-width: 1200px;
+  margin: auto;
+  padding: 30px 20px;
+}
+
+.header {
+  background: linear-gradient(135deg, #101b3c, #5936b8);
+  color: white;
+  padding: 35px;
+  border-radius: 18px;
+  margin-bottom: 30px;
+}
+
+.header h1 {
   font-size: 30px;
+  letter-spacing: 1px;
 }
 
-h2 {
-  margin-top: 35px;
+.header p {
+  margin-top: 10px;
+  color: #e1dcff;
 }
 
-p {
-  color: #cbd5e1;
+.welcome {
+  margin-bottom: 25px;
 }
 
-div[style] {
-  line-height: 1.6;
+.welcome h2 {
+  font-size: 25px;
+  margin-bottom: 8px;
+}
+
+.welcome p {
+  color: #687086;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: white;
+  padding: 25px;
+  border-radius: 16px;
+  box-shadow: 0 5px 20px rgba(20, 30, 60, 0.06);
+  transition: transform 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+}
+
+.icon {
+  font-size: 35px;
+}
+
+.card h3 {
+  margin: 15px 0 8px;
+  font-size: 20px;
+}
+
+.card p {
+  color: #747c90;
+  margin-bottom: 20px;
+}
+
+.card button {
+  background: #5936b8;
+  color: white;
+  border: none;
+  padding: 11px 18px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.card button:hover {
+  background: #42258f;
 }
 
 @media (max-width: 600px) {
-  h1 {
-    font-size: 25px;
+  .dashboard {
+    padding: 18px 14px;
   }
 
-  body {
-    font-size: 14px;
+  .header {
+    padding: 25px 20px;
+  }
+
+  .header h1 {
+    font-size: 24px;
+  }
+
+  .welcome h2 {
+    font-size: 22px;
   }
 }
