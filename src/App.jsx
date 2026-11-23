@@ -13,12 +13,14 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inscription, setInscription] = useState(false);
+
   const [produits, setProduits] = useState([]);
   const [nom, setNom] = useState("");
   const [prix, setPrix] = useState("");
   const [stock, setStock] = useState("");
-  const [message, setMessage] = useState("");
   const [modificationId, setModificationId] = useState(null);
+
+  const [message, setMessage] = useState("");
   const [chargement, setChargement] = useState(false);
 
   useEffect(() => {
@@ -53,11 +55,14 @@ export default function App() {
 
   async function connexion(e) {
     e.preventDefault();
-    setMessage("Chargement...");
+    setChargement(true);
+    setMessage("");
 
     const resultat = inscription
       ? await supabase.auth.signUp({ email, password })
       : await supabase.auth.signInWithPassword({ email, password });
+
+    setChargement(false);
 
     if (resultat.error) {
       setMessage(resultat.error.message);
@@ -86,28 +91,34 @@ export default function App() {
           .eq("id", modificationId)
       : await supabase.from("produits").insert(produit);
 
+    setChargement(false);
+
     if (resultat.error) {
       setMessage(resultat.error.message);
-    } else {
-      setNom("");
-      setPrix("");
-      setStock("");
-      setModificationId(null);
-      setMessage(
-        modificationId ? "Produit modifié !" : "Produit ajouté !"
-      );
-      await chargerProduits();
+      return;
     }
 
-    setChargement(false);
+    setNom("");
+    setPrix("");
+    setStock("");
+    setModificationId(null);
+    setMessage(
+      modificationId
+        ? "Produit modifié avec succès !"
+        : "Produit ajouté avec succès !"
+    );
+
+    chargerProduits();
   }
 
   function modifierProduit(produit) {
-    setModificationId(produit.id);
     setNom(produit.nom);
     setPrix(String(produit.prix));
     setStock(String(produit.quantite_stock));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setModificationId(produit.id);
+    document.getElementById("formulaire-produit")?.scrollIntoView({
+      behavior: "smooth"
+    });
   }
 
   async function supprimerProduit(id) {
@@ -121,16 +132,9 @@ export default function App() {
     if (error) {
       setMessage(error.message);
     } else {
-      setMessage("Produit supprimé !");
-      await chargerProduits();
+      setMessage("Produit supprimé.");
+      chargerProduits();
     }
-  }
-
-  function annulerModification() {
-    setModificationId(null);
-    setNom("");
-    setPrix("");
-    setStock("");
   }
 
   async function deconnexion() {
@@ -151,18 +155,21 @@ export default function App() {
     0
   );
 
+  const formatPrix = (montant) =>
+    new Intl.NumberFormat("fr-FR").format(montant) + " F CFA";
+
   if (!user) {
     return (
       <main className="auth-page">
         <section className="auth-card">
-          <div className="brand-mark">SP</div>
+          <div className="brand-logo">SP</div>
           <h1>SELL PILOT AI</h1>
-          <p className="subtitle">
+          <p className="auth-subtitle">
             Votre commerce, piloté intelligemment.
           </p>
 
           <h2>{inscription ? "Créer un compte" : "Bienvenue"}</h2>
-          <p>Accédez à votre espace de gestion commerciale.</p>
+          <p>Connectez-vous pour gérer votre activité.</p>
 
           <form onSubmit={connexion}>
             <label>Adresse e-mail</label>
@@ -183,13 +190,17 @@ export default function App() {
               required
             />
 
-            <button className="primary-btn" type="submit">
-              {inscription ? "Créer mon compte" : "Se connecter"}
+            <button type="submit" disabled={chargement}>
+              {chargement
+                ? "Chargement..."
+                : inscription
+                  ? "Créer mon compte"
+                  : "Se connecter"}
             </button>
           </form>
 
           <button
-            className="text-btn"
+            className="auth-switch"
             onClick={() => {
               setInscription(!inscription);
               setMessage("");
@@ -207,162 +218,212 @@ export default function App() {
   }
 
   return (
-    <main className="app-page">
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand-mark">SP</div>
+    <div className="app-layout">
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="brand-logo">SP</div>
           <div>
-            <h1>SELL PILOT AI</h1>
-            <span>Gestion intelligente</span>
+            <strong>SELL PILOT AI</strong>
+            <small>Business Manager</small>
           </div>
         </div>
 
-        <button className="logout-btn" onClick={deconnexion}>
-          Déconnexion
-        </button>
-      </header>
+        <p className="menu-label">MENU PRINCIPAL</p>
 
-      <section className="welcome">
-        <span className="eyebrow">ESPACE DE GESTION</span>
-        <h2>Bienvenue dans votre espace</h2>
-        <p>Pilotez votre activité depuis un seul endroit.</p>
-      </section>
+        <nav className="navigation">
+          <a className="nav-link active" href="#dashboard">▦ Tableau de bord</a>
+          <a className="nav-link" href="#produits">▤ Produits</a>
+          <a className="nav-link" href="#clients">♙ Clients</a>
+          <a className="nav-link" href="#commandes">▣ Commandes</a>
+          <a className="nav-link" href="#ventes">↗ Ventes</a>
+          <a className="nav-link" href="#factures">▧ Factures</a>
+        </nav>
 
-      <section className="stats-grid">
-        <article className="stat-card">
-          <span>Produits enregistrés</span>
-          <strong>{produits.length}</strong>
-          <small>Dans votre catalogue</small>
-        </article>
+        <div className="sidebar-bottom">
+          <span>Connecté</span>
+          <small>{user.email}</small>
+          <button className="logout-button" onClick={deconnexion}>
+            Déconnexion
+          </button>
+        </div>
+      </aside>
 
-        <article className="stat-card">
-          <span>Quantité en stock</span>
-          <strong>{totalStock}</strong>
-          <small>Unités enregistrées</small>
-        </article>
+      <main className="main-content">
+        <header className="topbar">
+          <div>
+            <span className="topbar-label">ESPACE DE GESTION</span>
+            <h1>Tableau de bord</h1>
+            <p>Bienvenue dans votre espace de gestion.</p>
+          </div>
+          <div className="user-avatar">SP</div>
+        </header>
 
-        <article className="stat-card">
-          <span>Valeur du stock</span>
-          <strong>{valeurStock.toLocaleString()}</strong>
-          <small>Prix × quantités</small>
-        </article>
-      </section>
-
-      <section className="content-grid">
-        <section className="panel">
-          <div className="panel-heading">
+        <section id="dashboard" className="dashboard-section">
+          <div className="section-heading">
             <div>
-              <span className="eyebrow">CATALOGUE</span>
-              <h2>
-                {modificationId ? "Modifier le produit" : "Ajouter un produit"}
-              </h2>
+              <h2>Vue d'ensemble</h2>
+              <p>Suivez les informations de votre catalogue.</p>
             </div>
           </div>
 
-          <form onSubmit={enregistrerProduit} className="product-form">
-            <label>Nom du produit</label>
-            <input
-              placeholder="Exemple : Chaussures"
-              value={nom}
-              onChange={(e) => setNom(e.target.value)}
-              required
-            />
+          <div className="stats-grid">
+            <article className="stat-card">
+              <span className="stat-icon">▤</span>
+              <p>Produits enregistrés</p>
+              <h3>{produits.length}</h3>
+              <small>Dans votre catalogue</small>
+            </article>
 
-            <label>Prix</label>
-            <input
-              type="number"
-              min="0"
-              placeholder="Prix du produit"
-              value={prix}
-              onChange={(e) => setPrix(e.target.value)}
-              required
-            />
+            <article className="stat-card">
+              <span className="stat-icon">▣</span>
+              <p>Quantité en stock</p>
+              <h3>{totalStock}</h3>
+              <small>Unités enregistrées</small>
+            </article>
 
-            <label>Quantité en stock</label>
-            <input
-              type="number"
-              min="0"
-              placeholder="Quantité disponible"
-              value={stock}
-              onChange={(e) => setStock(e.target.value)}
-              required
-            />
+            <article className="stat-card">
+              <span className="stat-icon">◈</span>
+              <p>Valeur du stock</p>
+              <h3>{formatPrix(valeurStock)}</h3>
+              <small>Prix × quantités</small>
+            </article>
+          </div>
+        </section>
 
-            <button
-              className="primary-btn"
-              type="submit"
-              disabled={chargement}
-            >
-              {chargement
-                ? "Enregistrement..."
-                : modificationId
-                  ? "Enregistrer les modifications"
-                  : "Ajouter le produit"}
-            </button>
+        <section id="produits" className="content-panel">
+          <div className="section-heading">
+            <div>
+              <span className="topbar-label">CATALOGUE</span>
+              <h2>Gestion des produits</h2>
+              <p>Ajoutez et gérez les articles de votre commerce.</p>
+            </div>
+          </div>
 
-            {modificationId && (
-              <button
-                className="secondary-btn"
-                type="button"
-                onClick={annulerModification}
-              >
-                Annuler
+          <form
+            id="formulaire-produit"
+            className="product-form"
+            onSubmit={enregistrerProduit}
+          >
+            <h3>
+              {modificationId ? "Modifier le produit" : "Ajouter un produit"}
+            </h3>
+
+            <div className="form-grid">
+              <div className="field">
+                <label>Nom du produit</label>
+                <input
+                  placeholder="Exemple : Chaussures"
+                  value={nom}
+                  onChange={(e) => setNom(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label>Prix de vente</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Prix du produit"
+                  value={prix}
+                  onChange={(e) => setPrix(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label>Quantité en stock</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Quantité disponible"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-actions">
+              <button type="submit" disabled={chargement}>
+                {chargement
+                  ? "Enregistrement..."
+                  : modificationId
+                    ? "Enregistrer les modifications"
+                    : "+ Ajouter le produit"}
               </button>
-            )}
+
+              {modificationId && (
+                <button
+                  type="button"
+                  className="cancel-button"
+                  onClick={() => {
+                    setModificationId(null);
+                    setNom("");
+                    setPrix("");
+                    setStock("");
+                  }}
+                >
+                  Annuler
+                </button>
+              )}
+            </div>
           </form>
 
           {message && <p className="notice">{message}</p>}
-        </section>
 
-        <section className="panel">
-          <div className="panel-heading">
+          <div className="inventory-header">
             <div>
-              <span className="eyebrow">INVENTAIRE</span>
-              <h2>Mes produits</h2>
+              <h3>Mon inventaire</h3>
+              <p>{produits.length} produit(s) enregistré(s)</p>
             </div>
-            <span className="count-badge">{produits.length}</span>
+            <button className="refresh-button" onClick={chargerProduits}>
+              Actualiser
+            </button>
           </div>
 
-          {produits.length === 0 ? (
-            <div className="empty-state">
-              <span>📦</span>
-              <h3>Aucun produit</h3>
-              <p>Ajoutez votre premier produit pour commencer.</p>
-            </div>
-          ) : (
-            <div className="product-list">
-              {produits.map((produit) => (
+          <div className="product-list">
+            {produits.length === 0 ? (
+              <div className="empty-state">
+                <span>▤</span>
+                <h3>Aucun produit pour le moment</h3>
+                <p>Ajoutez votre premier produit pour commencer.</p>
+              </div>
+            ) : (
+              produits.map((produit) => (
                 <article className="product-card" key={produit.id}>
+                  <div className="product-icon">▤</div>
                   <div className="product-info">
-                    <h3>{produit.nom}</h3>
-                    <p>Prix : {Number(produit.prix).toLocaleString()}</p>
-                    <p>Stock : {produit.quantite_stock}</p>
+                    <strong>{produit.nom}</strong>
+                    <span>{formatPrix(Number(produit.prix))}</span>
+                    <small>
+                      Stock : {produit.quantite_stock} unité(s)
+                    </small>
                   </div>
-
                   <div className="product-actions">
                     <button
-                      className="edit-btn"
+                      className="edit-button"
                       onClick={() => modifierProduit(produit)}
                     >
                       Modifier
                     </button>
                     <button
-                      className="delete-btn"
+                      className="delete-button"
                       onClick={() => supprimerProduit(produit.id)}
                     >
                       Supprimer
                     </button>
                   </div>
                 </article>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </section>
-      </section>
 
-      <footer className="footer">
-        SELL PILOT AI · Votre commerce, piloté intelligemment.
-      </footer>
-    </main>
+        <footer className="app-footer">
+          SELL PILOT AI · Gestion intelligente de votre commerce
+        </footer>
+      </main>
+    </div>
   );
 }
