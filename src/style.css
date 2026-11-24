@@ -127,7 +127,7 @@ button:active {
   display: flex;
 }
 
-/* MENU LATÉRAL */
+/* MENU */
 
 .sidebar {
   width: 255px;
@@ -187,7 +187,7 @@ button:active {
   background: #3157d5;
 }
 
-/* BAS DU MENU ET DÉCONNEXION */
+/* DÉCONNEXION */
 
 .sidebar-bottom {
   display: grid;
@@ -225,7 +225,7 @@ button:active {
   background: #d94b5b;
 }
 
-/* CONTENU PRINCIPAL */
+/* CONTENU */
 
 .main-content {
   flex: 1;
@@ -352,7 +352,7 @@ button:active {
   box-shadow: 0 5px 20px #17203308;
 }
 
-/* FORMULAIRE PRODUIT */
+/* FORMULAIRE */
 
 .product-form {
   margin-top: 22px;
@@ -469,7 +469,7 @@ input:focus {
   gap: 11px;
 }
 
-/* CARTE PRODUIT */
+/* PRODUITS */
 
 .product-card {
   display: flex;
@@ -522,8 +522,6 @@ input:focus {
   font-size: 12px;
   line-height: 1.5;
 }
-
-/* Prix et stock si ces classes sont présentes dans App.jsx */
 
 .product-price {
   color: #3157d5 !important;
@@ -640,28 +638,45 @@ input:focus {
     margin: 5px 4px 10px;
   }
 
+  /* MENU HORIZONTAL DÉFILANT */
+
   .navigation {
     display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .navigation::-webkit-scrollbar {
+    display: none;
   }
 
   .nav-link {
+    flex: 0 0 auto;
+    white-space: nowrap;
     padding: 10px 12px;
     font-size: 11px;
     border: 1px solid #ffffff12;
   }
 
+  /* DÉCONNEXION */
+
   .sidebar-bottom {
-    margin-top: 16px;
+    margin-top: 10px;
     padding: 13px 4px 0;
     gap: 8px;
   }
 
   .logout-button {
     margin-top: 4px;
-    padding: 12px;
+    padding: 10px;
+    font-size: 14px;
   }
+
+  /* CONTENU */
 
   .main-content {
     padding: 20px 14px;
