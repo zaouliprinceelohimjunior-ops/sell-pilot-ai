@@ -22,29 +22,43 @@ export default function App() {
 
   const [message, setMessage] = useState("");
   const [chargement, setChargement] = useState(false);
+  const [chargementProduits, setChargementProduits] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
       setUser(data.session?.user ?? null);
     });
 
-    const { data: listener } =
-      supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
         setUser(session?.user ?? null);
-      });
+      }
+    );
 
     return () => listener.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (user) chargerProduits();
+    if (user) {
+      chargerProduits();
+    } else {
+      setProduits([]);
+    }
   }, [user]);
 
   async function chargerProduits() {
+    setChargementProduits(true);
+
     const { data, error } = await supabase
       .from("produits")
       .select("*")
       .order("created_at", { ascending: false });
+
+    setChargementProduits(false);
 
     if (error) {
       setMessage(error.message);
@@ -75,16 +89,36 @@ export default function App() {
 
   async function enregistrerProduit(e) {
     e.preventDefault();
-    setChargement(true);
-    setMessage("");
+
+    if (!nom.trim()) {
+      setMessage("Veuillez saisir le nom du produit.");
+      return;
+    }
+
+    if (
+      prix === "" ||
+      stock === "" ||
+      !Number.isFinite(Number(prix)) ||
+      !Number.isFinite(Number(stock)) ||
+      Number(prix) < 0 ||
+      Number(stock) < 0
+    ) {
+      setMessage("Vérifiez le prix et la quantité en stock.");
+      return;
+    }
+
+    const enModification = modificationId !== null;
 
     const produit = {
-      nom,
+      nom: nom.trim(),
       prix: Number(prix),
       quantite_stock: Number(stock)
     };
 
-    const resultat = modificationId
+    setChargement(true);
+    setMessage("");
+
+    const resultat = enModification
       ? await supabase
           .from("produits")
           .update(produit)
@@ -98,17 +132,15 @@ export default function App() {
       return;
     }
 
-    setNom("");
-    setPrix("");
-    setStock("");
-    setModificationId(null);
+    reinitialiserFormulaire();
+
     setMessage(
-      modificationId
+      enModification
         ? "Produit modifié avec succès !"
         : "Produit ajouté avec succès !"
     );
 
-    chargerProduits();
+    await chargerProduits();
   }
 
   function modifierProduit(produit) {
@@ -116,13 +148,28 @@ export default function App() {
     setPrix(String(produit.prix));
     setStock(String(produit.quantite_stock));
     setModificationId(produit.id);
+
     document.getElementById("formulaire-produit")?.scrollIntoView({
-      behavior: "smooth"
+      behavior: "smooth",
+      block: "start"
     });
   }
 
+  function reinitialiserFormulaire() {
+    setNom("");
+    setPrix("");
+    setStock("");
+    setModificationId(null);
+  }
+
   async function supprimerProduit(id) {
-    if (!window.confirm("Veux-tu vraiment supprimer ce produit ?")) return;
+    const confirmation = window.confirm(
+      "Veux-tu vraiment supprimer ce produit ?"
+    );
+
+    if (!confirmation) return;
+
+    setMessage("");
 
     const { error } = await supabase
       .from("produits")
@@ -132,18 +179,31 @@ export default function App() {
     if (error) {
       setMessage(error.message);
     } else {
-      setMessage("Produit supprimé.");
-      chargerProduits();
+      setMessage("Produit supprimé avec succès.");
+
+      if (modificationId === id) {
+        reinitialiserFormulaire();
+      }
+
+      await chargerProduits();
     }
   }
 
   async function deconnexion() {
-    await supabase.auth.signOut();
-    setProduits([]);
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setProduits([]);
+      reinitialiserFormulaire();
+      setMessage("");
+    }
   }
 
   const totalStock = produits.reduce(
-    (total, produit) => total + Number(produit.quantite_stock || 0),
+    (total, produit) =>
+      total + Number(produit.quantite_stock || 0),
     0
   );
 
@@ -163,28 +223,43 @@ export default function App() {
       <main className="auth-page">
         <section className="auth-card">
           <div className="brand-logo">SP</div>
+
           <h1>SELL PILOT AI</h1>
+
           <p className="auth-subtitle">
             Votre commerce, piloté intelligemment.
           </p>
 
           <h2>{inscription ? "Créer un compte" : "Bienvenue"}</h2>
-          <p>Connectez-vous pour gérer votre activité.</p>
+
+          <p>
+            {inscription
+              ? "Créez votre espace professionnel."
+              : "Connectez-vous pour gérer votre activité."}
+          </p>
 
           <form onSubmit={connexion}>
-            <label>Adresse e-mail</label>
+            <label htmlFor="email">Adresse e-mail</label>
+
             <input
+              id="email"
               type="email"
               placeholder="exemple@email.com"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
 
-            <label>Mot de passe</label>
+            <label htmlFor="password">Mot de passe</label>
+
             <input
+              id="password"
               type="password"
               placeholder="Votre mot de passe"
+              autoComplete={
+                inscription ? "new-password" : "current-password"
+              }
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -200,6 +275,7 @@ export default function App() {
           </form>
 
           <button
+            type="button"
             className="auth-switch"
             onClick={() => {
               setInscription(!inscription);
@@ -222,6 +298,7 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="brand-logo">SP</div>
+
           <div>
             <strong>SELL PILOT AI</strong>
             <small>Business Manager</small>
@@ -231,17 +308,35 @@ export default function App() {
         <p className="menu-label">MENU PRINCIPAL</p>
 
         <nav className="navigation">
-          <a className="nav-link active" href="#dashboard">▦ Tableau de bord</a>
-          <a className="nav-link" href="#produits">▤ Produits</a>
-          <a className="nav-link" href="#clients">♙ Clients</a>
-          <a className="nav-link" href="#commandes">▣ Commandes</a>
-          <a className="nav-link" href="#ventes">↗ Ventes</a>
-          <a className="nav-link" href="#factures">▧ Factures</a>
+          <a className="nav-link active" href="#dashboard">
+            <span>▦</span> Tableau de bord
+          </a>
+
+          <a className="nav-link" href="#produits">
+            <span>▤</span> Produits
+          </a>
+
+          <span className="nav-link disabled" aria-disabled="true">
+            <span>♙</span> Clients <small>Bientôt</small>
+          </span>
+
+          <span className="nav-link disabled" aria-disabled="true">
+            <span>▣</span> Commandes <small>Bientôt</small>
+          </span>
+
+          <span className="nav-link disabled" aria-disabled="true">
+            <span>↗</span> Ventes <small>Bientôt</small>
+          </span>
+
+          <span className="nav-link disabled" aria-disabled="true">
+            <span>▧</span> Factures <small>Bientôt</small>
+          </span>
         </nav>
 
         <div className="sidebar-bottom">
-          <span>Connecté</span>
+          <span>● Connecté</span>
           <small>{user.email}</small>
+
           <button className="logout-button" onClick={deconnexion}>
             Déconnexion
           </button>
@@ -255,6 +350,7 @@ export default function App() {
             <h1>Tableau de bord</h1>
             <p>Bienvenue dans votre espace de gestion.</p>
           </div>
+
           <div className="user-avatar">SP</div>
         </header>
 
@@ -285,7 +381,7 @@ export default function App() {
               <span className="stat-icon">◈</span>
               <p>Valeur du stock</p>
               <h3>{formatPrix(valeurStock)}</h3>
-              <small>Prix × quantités</small>
+              <small>Prix multiplié par quantités</small>
             </article>
           </div>
         </section>
@@ -305,13 +401,16 @@ export default function App() {
             onSubmit={enregistrerProduit}
           >
             <h3>
-              {modificationId ? "Modifier le produit" : "Ajouter un produit"}
+              {modificationId
+                ? "Modifier le produit"
+                : "Ajouter un produit"}
             </h3>
 
             <div className="form-grid">
               <div className="field">
-                <label>Nom du produit</label>
+                <label htmlFor="nom-produit">Nom du produit</label>
                 <input
+                  id="nom-produit"
                   placeholder="Exemple : Chaussures"
                   value={nom}
                   onChange={(e) => setNom(e.target.value)}
@@ -320,10 +419,12 @@ export default function App() {
               </div>
 
               <div className="field">
-                <label>Prix de vente</label>
+                <label htmlFor="prix-produit">Prix de vente</label>
                 <input
+                  id="prix-produit"
                   type="number"
                   min="0"
+                  step="any"
                   placeholder="Prix du produit"
                   value={prix}
                   onChange={(e) => setPrix(e.target.value)}
@@ -332,10 +433,12 @@ export default function App() {
               </div>
 
               <div className="field">
-                <label>Quantité en stock</label>
+                <label htmlFor="stock-produit">Quantité en stock</label>
                 <input
+                  id="stock-produit"
                   type="number"
                   min="0"
+                  step="1"
                   placeholder="Quantité disponible"
                   value={stock}
                   onChange={(e) => setStock(e.target.value)}
@@ -357,12 +460,7 @@ export default function App() {
                 <button
                   type="button"
                   className="cancel-button"
-                  onClick={() => {
-                    setModificationId(null);
-                    setNom("");
-                    setPrix("");
-                    setStock("");
-                  }}
+                  onClick={reinitialiserFormulaire}
                 >
                   Annuler
                 </button>
@@ -377,13 +475,22 @@ export default function App() {
               <h3>Mon inventaire</h3>
               <p>{produits.length} produit(s) enregistré(s)</p>
             </div>
-            <button className="refresh-button" onClick={chargerProduits}>
-              Actualiser
+
+            <button
+              className="refresh-button"
+              onClick={chargerProduits}
+              disabled={chargementProduits}
+            >
+              {chargementProduits ? "Actualisation..." : "Actualiser"}
             </button>
           </div>
 
           <div className="product-list">
-            {produits.length === 0 ? (
+            {chargementProduits && produits.length === 0 ? (
+              <div className="empty-state">
+                Chargement de votre inventaire...
+              </div>
+            ) : produits.length === 0 ? (
               <div className="empty-state">
                 <span>▤</span>
                 <h3>Aucun produit pour le moment</h3>
@@ -393,13 +500,19 @@ export default function App() {
               produits.map((produit) => (
                 <article className="product-card" key={produit.id}>
                   <div className="product-icon">▤</div>
+
                   <div className="product-info">
                     <strong>{produit.nom}</strong>
-                    <span>{formatPrix(Number(produit.prix))}</span>
-                    <small>
+
+                    <span className="product-price">
+                      {formatPrix(Number(produit.prix))}
+                    </span>
+
+                    <small className="product-stock">
                       Stock : {produit.quantite_stock} unité(s)
                     </small>
                   </div>
+
                   <div className="product-actions">
                     <button
                       className="edit-button"
@@ -407,6 +520,7 @@ export default function App() {
                     >
                       Modifier
                     </button>
+
                     <button
                       className="delete-button"
                       onClick={() => supprimerProduit(produit.id)}
