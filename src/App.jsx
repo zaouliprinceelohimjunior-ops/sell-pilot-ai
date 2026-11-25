@@ -1,4 +1,4 @@
- 
+
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import "./style.css";
@@ -20,34 +20,25 @@ export default function App() {
   const [nom, setNom] = useState("");
   const [prix, setPrix] = useState("");
   const [stock, setStock] = useState("");
-  const [modificationId, setModificationId] = useState(null);
+  const [produitId, setProduitId] = useState(null);
 
   const [nomClient, setNomClient] = useState("");
-  const [telephoneClient, setTelephoneClient] = useState("");
-  const [courrielClient, setCourrielClient] = useState("");
-  const [adresseClient, setAdresseClient] = useState("");
-  const [notesClient, setNotesClient] = useState("");
-  const [modificationClientId, setModificationClientId] = useState(null);
+  const [telephone, setTelephone] = useState("");
+  const [courriel, setCourriel] = useState("");
+  const [adresse, setAdresse] = useState("");
+  const [notes, setNotes] = useState("");
+  const [clientId, setClientId] = useState(null);
 
   const [message, setMessage] = useState("");
   const [chargement, setChargement] = useState(false);
-  const [chargementProduits, setChargementProduits] = useState(false);
-  const [chargementClients, setChargementClients] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error) {
-        setMessage(error.message);
-        return;
-      }
-
+    supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
-      }
+      (_event, session) => setUser(session?.user ?? null)
     );
 
     return () => listener.subscription.unsubscribe();
@@ -64,37 +55,23 @@ export default function App() {
   }, [user]);
 
   async function chargerProduits() {
-    setChargementProduits(true);
-
     const { data, error } = await supabase
       .from("produits")
       .select("*")
       .order("created_at", { ascending: false });
 
-    setChargementProduits(false);
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setProduits(data || []);
-    }
+    if (error) setMessage(error.message);
+    else setProduits(data || []);
   }
 
   async function chargerClients() {
-    setChargementClients(true);
-
     const { data, error } = await supabase
       .from("clients")
       .select("*")
       .order("created_at", { ascending: false });
 
-    setChargementClients(false);
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setClients(data || []);
-    }
+    if (error) setMessage(error.message);
+    else setClients(data || []);
   }
 
   async function connexion(e) {
@@ -117,50 +94,32 @@ export default function App() {
     }
   }
 
-  function reinitialiserProduit() {
+  function viderProduit() {
     setNom("");
     setPrix("");
     setStock("");
-    setModificationId(null);
+    setProduitId(null);
   }
 
   async function enregistrerProduit(e) {
     e.preventDefault();
 
-    if (!nom.trim()) {
-      setMessage("Veuillez saisir le nom du produit.");
+    if (!nom.trim() || prix === "" || stock === "") {
+      setMessage("Remplis tous les champs du produit.");
       return;
     }
 
-    if (
-      prix === "" ||
-      stock === "" ||
-      !Number.isFinite(Number(prix)) ||
-      !Number.isFinite(Number(stock)) ||
-      Number(prix) < 0 ||
-      Number(stock) < 0
-    ) {
-      setMessage("Vérifiez le prix et la quantité en stock.");
-      return;
-    }
-
-    const enModification = modificationId !== null;
-
-    const produit = {
+    const valeurs = {
       nom: nom.trim(),
       prix: Number(prix),
       quantite_stock: Number(stock)
     };
 
     setChargement(true);
-    setMessage("");
 
-    const resultat = enModification
-      ? await supabase
-          .from("produits")
-          .update(produit)
-          .eq("id", modificationId)
-      : await supabase.from("produits").insert(produit);
+    const resultat = produitId
+      ? await supabase.from("produits").update(valeurs).eq("id", produitId)
+      : await supabase.from("produits").insert(valeurs);
 
     setChargement(false);
 
@@ -169,91 +128,65 @@ export default function App() {
       return;
     }
 
-    reinitialiserProduit();
-
-    setMessage(
-      enModification
-        ? "Produit modifié avec succès !"
-        : "Produit ajouté avec succès !"
-    );
-
-    await chargerProduits();
+    viderProduit();
+    setMessage("Produit enregistré avec succès !");
+    chargerProduits();
   }
 
-  function modifierProduit(produit) {
-    setNom(produit.nom || "");
-    setPrix(String(produit.prix ?? ""));
-    setStock(String(produit.quantite_stock ?? ""));
-    setModificationId(produit.id);
-
-    document.getElementById("formulaire-produit")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
+  function modifierProduit(p) {
+    setNom(p.nom || "");
+    setPrix(String(p.prix ?? ""));
+    setStock(String(p.quantite_stock ?? ""));
+    setProduitId(p.id);
+    document.getElementById("formulaire-produit")?.scrollIntoView();
   }
 
   async function supprimerProduit(id) {
-    if (!window.confirm("Veux-tu vraiment supprimer ce produit ?")) {
-      return;
-    }
-
-    setMessage("");
+    if (!window.confirm("Supprimer ce produit ?")) return;
 
     const { error } = await supabase
       .from("produits")
       .delete()
       .eq("id", id);
 
-    if (error) {
-      setMessage(error.message);
-      return;
+    if (error) setMessage(error.message);
+    else {
+      setMessage("Produit supprimé.");
+      chargerProduits();
     }
-
-    if (modificationId === id) {
-      reinitialiserProduit();
-    }
-
-    setMessage("Produit supprimé avec succès.");
-    await chargerProduits();
   }
 
-  function reinitialiserClient() {
+  function viderClient() {
     setNomClient("");
-    setTelephoneClient("");
-    setCourrielClient("");
-    setAdresseClient("");
-    setNotesClient("");
-    setModificationClientId(null);
+    setTelephone("");
+    setCourriel("");
+    setAdresse("");
+    setNotes("");
+    setClientId(null);
   }
 
   async function enregistrerClient(e) {
     e.preventDefault();
 
     if (!nomClient.trim()) {
-      setMessage("Veuillez saisir le nom du client.");
+      setMessage("Saisis le nom du client.");
       return;
     }
 
-    const client = {
+    const valeurs = {
       user_id: user.id,
       nom_complet: nomClient.trim(),
-      "téléphone": telephoneClient.trim(),
-      Courriel: courrielClient.trim(),
-      adresse: adresseClient.trim(),
-      notes: notesClient.trim()
+      "téléphone": telephone.trim(),
+      Email: courriel.trim(),
+      adresse: adresse.trim(),
+      notes: notes.trim()
     };
 
-    const enModification = modificationClientId !== null;
-
     setChargement(true);
-    setMessage("");
 
-    const resultat = enModification
-      ? await supabase
-          .from("clients")
-          .update(client)
-          .eq("id", modificationClientId)
-      : await supabase.from("clients").insert(client);
+    const resultat = clientId
+      ? await supabase.from("clients").update(valeurs).eq("id", clientId)
+      : await supabase.from("clients").insert(valeurs);
 
     setChargement(false);
 
@@ -262,130 +195,79 @@ export default function App() {
       return;
     }
 
-    reinitialiserClient();
-
-    setMessage(
-      enModification
-        ? "Client modifié avec succès !"
-        : "Client ajouté avec succès !"
-    );
-
-    await chargerClients();
+    viderClient();
+    setMessage("Client enregistré avec succès !");
+    chargerClients();
   }
 
-  function modifierClient(client) {
-    setNomClient(client.nom_complet || "");
-    setTelephoneClient(client["téléphone"] || "");
-    setCourrielClient(client.Courriel || "");
-    setAdresseClient(client.adresse || "");
-    setNotesClient(client.notes || "");
-    setModificationClientId(client.id);
-
-    document.getElementById("formulaire-client")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
+  function modifierClient(c) {
+    setNomClient(c.nom_complet || "");
+    setTelephone(c["téléphone"] || "");
+    setCourriel(c.Email || "");
+    setAdresse(c.adresse || "");
+    setNotes(c.notes || "");
+    setClientId(c.id);
+    document.getElementById("formulaire-client")?.scrollIntoView();
   }
 
   async function supprimerClient(id) {
-    if (!window.confirm("Veux-tu vraiment supprimer ce client ?")) {
-      return;
-    }
-
-    setMessage("");
+    if (!window.confirm("Supprimer ce client ?")) return;
 
     const { error } = await supabase
       .from("clients")
       .delete()
       .eq("id", id);
 
-    if (error) {
-      setMessage(error.message);
-      return;
+    if (error) setMessage(error.message);
+    else {
+      setMessage("Client supprimé.");
+      chargerClients();
     }
-
-    if (modificationClientId === id) {
-      reinitialiserClient();
-    }
-
-    setMessage("Client supprimé avec succès.");
-    await chargerClients();
   }
 
   async function deconnexion() {
     const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setProduits([]);
-    setClients([]);
-    reinitialiserProduit();
-    reinitialiserClient();
-    setMessage("");
+    if (error) setMessage(error.message);
   }
 
   const totalStock = produits.reduce(
-    (total, produit) =>
-      total + Number(produit.quantite_stock || 0),
+    (total, p) => total + Number(p.quantite_stock || 0),
     0
   );
 
   const valeurStock = produits.reduce(
-    (total, produit) =>
-      total +
-      Number(produit.prix || 0) *
-        Number(produit.quantite_stock || 0),
+    (total, p) =>
+      total + Number(p.prix || 0) * Number(p.quantite_stock || 0),
     0
   );
 
-  const formatPrix = (montant) =>
-    new Intl.NumberFormat("fr-FR").format(montant) + " F CFA";
+  const formatPrix = (n) =>
+    new Intl.NumberFormat("fr-FR").format(n) + " F CFA";
 
   if (!user) {
     return (
       <main className="auth-page">
         <section className="auth-card">
           <div className="brand-logo">SP</div>
-
           <h1>SELL PILOT AI</h1>
-
           <p className="auth-subtitle">
             Votre commerce, piloté intelligemment.
           </p>
 
           <h2>{inscription ? "Créer un compte" : "Bienvenue"}</h2>
 
-          <p>
-            {inscription
-              ? "Créez votre espace professionnel."
-              : "Connectez-vous pour gérer votre activité."}
-          </p>
-
           <form onSubmit={connexion}>
-            <label htmlFor="email">Adresse e-mail</label>
-
+            <label>Adresse e-mail</label>
             <input
-              id="email"
               type="email"
-              placeholder="exemple@email.com"
-              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
 
-            <label htmlFor="password">Mot de passe</label>
-
+            <label>Mot de passe</label>
             <input
-              id="password"
               type="password"
-              placeholder="Votre mot de passe"
-              autoComplete={
-                inscription ? "new-password" : "current-password"
-              }
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -401,16 +283,13 @@ export default function App() {
           </form>
 
           <button
-            type="button"
             className="auth-switch"
             onClick={() => {
               setInscription(!inscription);
               setMessage("");
             }}
           >
-            {inscription
-              ? "J'ai déjà un compte"
-              : "Créer un nouveau compte"}
+            {inscription ? "J'ai déjà un compte" : "Créer un nouveau compte"}
           </button>
 
           {message && <p className="notice">{message}</p>}
@@ -424,7 +303,6 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="brand-logo">SP</div>
-
           <div>
             <strong>SELL PILOT AI</strong>
             <small>Business Manager</small>
@@ -434,35 +312,17 @@ export default function App() {
         <p className="menu-label">MENU PRINCIPAL</p>
 
         <nav className="navigation">
-          <a className="nav-link active" href="#dashboard">
-            <span>▦</span> Tableau de bord
-          </a>
-
-          <a className="nav-link" href="#produits">
-            <span>▤</span> Produits
-          </a>
-
-          <a className="nav-link" href="#clients">
-            <span>♙</span> Clients
-          </a>
-
-          <span className="nav-link disabled" aria-disabled="true">
-            <span>▣</span> Commandes <small>Bientôt</small>
-          </span>
-
-          <span className="nav-link disabled" aria-disabled="true">
-            <span>↗</span> Ventes <small>Bientôt</small>
-          </span>
-
-          <span className="nav-link disabled" aria-disabled="true">
-            <span>▧</span> Factures <small>Bientôt</small>
-          </span>
+          <a className="nav-link active" href="#dashboard">▦ Tableau de bord</a>
+          <a className="nav-link" href="#produits">▤ Produits</a>
+          <a className="nav-link" href="#clients">♙ Clients</a>
+          <span className="nav-link disabled">▣ Commandes <small>Bientôt</small></span>
+          <span className="nav-link disabled">↗ Ventes <small>Bientôt</small></span>
+          <span className="nav-link disabled">▧ Factures <small>Bientôt</small></span>
         </nav>
 
         <div className="sidebar-bottom">
           <span>● Connecté</span>
           <small>{user.email}</small>
-
           <button className="logout-button" onClick={deconnexion}>
             Déconnexion
           </button>
@@ -476,7 +336,6 @@ export default function App() {
             <h1>Tableau de bord</h1>
             <p>Bienvenue dans votre espace de gestion.</p>
           </div>
-
           <div className="user-avatar">SP</div>
         </header>
 
@@ -484,7 +343,7 @@ export default function App() {
           <div className="section-heading">
             <div>
               <h2>Vue d'ensemble</h2>
-              <p>Suivez les informations de votre catalogue.</p>
+              <p>Suivez votre activité commerciale.</p>
             </div>
           </div>
 
@@ -507,7 +366,7 @@ export default function App() {
               <span className="stat-icon">◈</span>
               <p>Valeur du stock</p>
               <h3>{formatPrix(valeurStock)}</h3>
-              <small>Prix multiplié par quantités</small>
+              <small>Valeur totale du catalogue</small>
             </article>
 
             <article className="stat-card">
@@ -518,6 +377,8 @@ export default function App() {
             </article>
           </div>
         </section>
+
+        {message && <p className="notice">{message}</p>}
 
         <section id="produits" className="content-panel">
           <div className="section-heading">
@@ -533,135 +394,64 @@ export default function App() {
             className="product-form"
             onSubmit={enregistrerProduit}
           >
-            <h3>
-              {modificationId ? "Modifier le produit" : "Ajouter un produit"}
-            </h3>
+            <h3>{produitId ? "Modifier le produit" : "Ajouter un produit"}</h3>
 
             <div className="form-grid">
               <div className="field">
-                <label htmlFor="nom-produit">Nom du produit</label>
-                <input
-                  id="nom-produit"
-                  placeholder="Exemple : Chaussures"
-                  value={nom}
-                  onChange={(e) => setNom(e.target.value)}
-                  required
-                />
+                <label>Nom du produit</label>
+                <input value={nom} onChange={(e) => setNom(e.target.value)} required />
               </div>
 
               <div className="field">
-                <label htmlFor="prix-produit">Prix de vente</label>
-                <input
-                  id="prix-produit"
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="Prix du produit"
-                  value={prix}
-                  onChange={(e) => setPrix(e.target.value)}
-                  required
-                />
+                <label>Prix de vente</label>
+                <input type="number" min="0" value={prix} onChange={(e) => setPrix(e.target.value)} required />
               </div>
 
               <div className="field">
-                <label htmlFor="stock-produit">Quantité en stock</label>
-                <input
-                  id="stock-produit"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="Quantité disponible"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  required
-                />
+                <label>Quantité en stock</label>
+                <input type="number" min="0" value={stock} onChange={(e) => setStock(e.target.value)} required />
               </div>
             </div>
 
             <div className="form-actions">
               <button type="submit" disabled={chargement}>
-                {chargement
-                  ? "Enregistrement..."
-                  : modificationId
-                    ? "Enregistrer les modifications"
-                    : "+ Ajouter le produit"}
+                {chargement ? "Enregistrement..." : produitId ? "Modifier" : "+ Ajouter le produit"}
               </button>
-
-              {modificationId && (
-                <button
-                  type="button"
-                  className="cancel-button"
-                  onClick={reinitialiserProduit}
-                >
+              {produitId && (
+                <button type="button" className="cancel-button" onClick={viderProduit}>
                   Annuler
                 </button>
               )}
             </div>
           </form>
 
-          {message && <p className="notice">{message}</p>}
-
           <div className="inventory-header">
             <div>
               <h3>Mon inventaire</h3>
               <p>{produits.length} produit(s) enregistré(s)</p>
             </div>
-
-            <button
-              className="refresh-button"
-              onClick={chargerProduits}
-              disabled={chargementProduits}
-            >
-              {chargementProduits ? "Actualisation..." : "Actualiser"}
+            <button className="refresh-button" onClick={chargerProduits}>
+              Actualiser
             </button>
           </div>
 
           <div className="product-list">
-            {chargementProduits && produits.length === 0 ? (
-              <div className="empty-state">
-                Chargement de votre inventaire...
-              </div>
-            ) : produits.length === 0 ? (
-              <div className="empty-state">
-                <span>▤</span>
-                <h3>Aucun produit pour le moment</h3>
-                <p>Ajoutez votre premier produit pour commencer.</p>
-              </div>
-            ) : (
-              produits.map((produit) => (
-                <article className="product-card" key={produit.id}>
-                  <div className="product-icon">▤</div>
-
-                  <div className="product-info">
-                    <strong>{produit.nom}</strong>
-
-                    <span className="product-price">
-                      {formatPrix(Number(produit.prix))}
-                    </span>
-
-                    <small className="product-stock">
-                      Stock : {produit.quantite_stock} unité(s)
-                    </small>
-                  </div>
-
-                  <div className="product-actions">
-                    <button
-                      className="edit-button"
-                      onClick={() => modifierProduit(produit)}
-                    >
-                      Modifier
-                    </button>
-
-                    <button
-                      className="delete-button"
-                      onClick={() => supprimerProduit(produit.id)}
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                </article>
-              ))
-            )}
+            {produits.length === 0 ? (
+              <div className="empty-state">Aucun produit enregistré.</div>
+            ) : produits.map((p) => (
+              <article className="product-card" key={p.id}>
+                <div className="product-icon">▤</div>
+                <div className="product-info">
+                  <strong>{p.nom}</strong>
+                  <span className="product-price">{formatPrix(Number(p.prix))}</span>
+                  <small className="product-stock">Stock : {p.quantite_stock}</small>
+                </div>
+                <div className="product-actions">
+                  <button className="edit-button" onClick={() => modifierProduit(p)}>Modifier</button>
+                  <button className="delete-button" onClick={() => supprimerProduit(p.id)}>Supprimer</button>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -679,157 +469,76 @@ export default function App() {
             className="product-form"
             onSubmit={enregistrerClient}
           >
-            <h3>
-              {modificationClientId
-                ? "Modifier le client"
-                : "Ajouter un client"}
-            </h3>
+            <h3>{clientId ? "Modifier le client" : "Ajouter un client"}</h3>
 
             <div className="form-grid">
               <div className="field">
-                <label htmlFor="nom-client">Nom complet</label>
-                <input
-                  id="nom-client"
-                  placeholder="Nom du client"
-                  value={nomClient}
-                  onChange={(e) => setNomClient(e.target.value)}
-                  required
-                />
+                <label>Nom complet</label>
+                <input value={nomClient} onChange={(e) => setNomClient(e.target.value)} required />
               </div>
 
               <div className="field">
-                <label htmlFor="telephone-client">Téléphone</label>
-                <input
-                  id="telephone-client"
-                  type="tel"
-                  placeholder="Numéro de téléphone"
-                  value={telephoneClient}
-                  onChange={(e) => setTelephoneClient(e.target.value)}
-                />
+                <label>Téléphone</label>
+                <input value={telephone} onChange={(e) => setTelephone(e.target.value)} />
               </div>
 
               <div className="field">
-                <label htmlFor="courriel-client">Courriel</label>
-                <input
-                  id="courriel-client"
-                  type="email"
-                  placeholder="Adresse e-mail"
-                  value={courrielClient}
-                  onChange={(e) => setCourrielClient(e.target.value)}
-                />
+                <label>Courriel</label>
+                <input type="email" value={courriel} onChange={(e) => setCourriel(e.target.value)} />
               </div>
 
               <div className="field">
-                <label htmlFor="adresse-client">Adresse</label>
-                <input
-                  id="adresse-client"
-  
-                  placeholder="Adresse du client"
-                  value={adresseClient}
-                  onChange={(e) => setAdresseClient(e.target.value)}
-                />
+                <label>Adresse</label>
+                <input value={adresse} onChange={(e) => setAdresse(e.target.value)} />
               </div>
 
               <div className="field">
-                <label htmlFor="notes-client">Notes</label>
-                <input
-                  id="notes-client"
-                  placeholder="Informations complémentaires"
-                  value={notesClient}
-                  onChange={(e) => setNotesClient(e.target.value)}
-                />
+                <label>Notes</label>
+                <input value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
             </div>
 
             <div className="form-actions">
               <button type="submit" disabled={chargement}>
-                {chargement
-                  ? "Enregistrement..."
-                  : modificationClientId
-                    ? "Enregistrer les modifications"
-                    : "+ Ajouter le client"}
+                {chargement ? "Enregistrement..." : clientId ? "Modifier le client" : "+ Ajouter le client"}
               </button>
-
-              {modificationClientId && (
-                <button
-                  type="button"
-                  className="cancel-button"
-                  onClick={reinitialiserClient}
-                >
+              {clientId && (
+                <button type="button" className="cancel-button" onClick={viderClient}>
                   Annuler
                 </button>
               )}
             </div>
           </form>
 
-          {message && <p className="notice">{message}</p>}
-
           <div className="inventory-header">
             <div>
               <h3>Mes clients</h3>
               <p>{clients.length} client(s) enregistré(s)</p>
             </div>
-
-            <button
-              className="refresh-button"
-              onClick={chargerClients}
-              disabled={chargementClients}
-            >
-              {chargementClients ? "Actualisation..." : "Actualiser"}
+            <button className="refresh-button" onClick={chargerClients}>
+              Actualiser
             </button>
           </div>
 
           <div className="product-list">
-            {chargementClients && clients.length === 0 ? (
-              <div className="empty-state">Chargement de vos clients...</div>
-            ) : clients.length === 0 ? (
-              <div className="empty-state">
-                <span>♙</span>
-                <h3>Aucun client pour le moment</h3>
-                <p>Ajoutez votre premier client pour commencer.</p>
-              </div>
-            ) : (
-              clients.map((client) => (
-                <article className="product-card" key={client.id}>
-                  <div className="product-icon">♙</div>
-
-                  <div className="product-info">
-                    <strong>{client.nom_complet}</strong>
-                    <span className="product-price">
-                      {client["téléphone"] || "Pas de téléphone"}
-                    </span>
-                    <small className="product-stock">
-                      {client.Courriel || "Pas de courriel"}
-                    </small>
-                    {client.adresse && (
-                      <small className="product-stock">
-                        Adresse : {client.adresse}
-                      </small>
-                    )}
-                    {client.notes && (
-                      <small className="product-stock">
-                        Notes : {client.notes}
-                      </small>
-                    )}
-                  </div>
-
-                  <div className="product-actions">
-                    <button
-                      className="edit-button"
-                      onClick={() => modifierClient(client)}
-                    >
-                      Modifier
-                    </button>
-                    <button
-                      className="delete-button"
-                      onClick={() => supprimerClient(client.id)}
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                </article>
-              ))
-            )}
+            {clients.length === 0 ? (
+              <div className="empty-state">Aucun client enregistré.</div>
+            ) : clients.map((c) => (
+              <article className="product-card" key={c.id}>
+                <div className="product-icon">♙</div>
+                <div className="product-info">
+                  <strong>{c.nom_complet}</strong>
+                  <span className="product-price">{c["téléphone"] || "Pas de téléphone"}</span>
+                  <small className="product-stock">{c.Email || "Pas de courriel"}</small>
+                  {c.adresse && <small className="product-stock">Adresse : {c.adresse}</small>}
+                  {c.notes && <small className="product-stock">Notes : {c.notes}</small>}
+                </div>
+                <div className="product-actions">
+                  <button className="edit-button" onClick={() => modifierClient(c)}>Modifier</button>
+                  <button className="delete-button" onClick={() => supprimerClient(c.id)}>Supprimer</button>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
 
