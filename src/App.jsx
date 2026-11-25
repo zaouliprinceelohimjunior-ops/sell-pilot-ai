@@ -1,4 +1,4 @@
-
+ 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import "./style.css";
@@ -15,12 +15,13 @@ export default function App() {
   const [inscription, setInscription] = useState(false);
 
   const [produits, setProduits] = useState([]);
+  const [clients, setClients] = useState([]);
+
   const [nom, setNom] = useState("");
   const [prix, setPrix] = useState("");
   const [stock, setStock] = useState("");
   const [modificationId, setModificationId] = useState(null);
 
-  const [clients, setClients] = useState([]);
   const [nomClient, setNomClient] = useState("");
   const [telephoneClient, setTelephoneClient] = useState("");
   const [courrielClient, setCourrielClient] = useState("");
@@ -39,6 +40,7 @@ export default function App() {
         setMessage(error.message);
         return;
       }
+
       setUser(data.session?.user ?? null);
     });
 
@@ -115,6 +117,13 @@ export default function App() {
     }
   }
 
+  function reinitialiserProduit() {
+    setNom("");
+    setPrix("");
+    setStock("");
+    setModificationId(null);
+  }
+
   async function enregistrerProduit(e) {
     e.preventDefault();
 
@@ -160,7 +169,7 @@ export default function App() {
       return;
     }
 
-    reinitialiserFormulaire();
+    reinitialiserProduit();
 
     setMessage(
       enModification
@@ -172,9 +181,9 @@ export default function App() {
   }
 
   function modifierProduit(produit) {
-    setNom(produit.nom);
-    setPrix(String(produit.prix));
-    setStock(String(produit.quantite_stock));
+    setNom(produit.nom || "");
+    setPrix(String(produit.prix ?? ""));
+    setStock(String(produit.quantite_stock ?? ""));
     setModificationId(produit.id);
 
     document.getElementById("formulaire-produit")?.scrollIntoView({
@@ -183,19 +192,10 @@ export default function App() {
     });
   }
 
-  function reinitialiserFormulaire() {
-    setNom("");
-    setPrix("");
-    setStock("");
-    setModificationId(null);
-  }
-
   async function supprimerProduit(id) {
-    const confirmation = window.confirm(
-      "Veux-tu vraiment supprimer ce produit ?"
-    );
-
-    if (!confirmation) return;
+    if (!window.confirm("Veux-tu vraiment supprimer ce produit ?")) {
+      return;
+    }
 
     setMessage("");
 
@@ -206,18 +206,18 @@ export default function App() {
 
     if (error) {
       setMessage(error.message);
-    } else {
-      setMessage("Produit supprimé avec succès.");
-
-      if (modificationId === id) {
-        reinitialiserFormulaire();
-      }
-
-      await chargerProduits();
+      return;
     }
+
+    if (modificationId === id) {
+      reinitialiserProduit();
+    }
+
+    setMessage("Produit supprimé avec succès.");
+    await chargerProduits();
   }
 
-  function reinitialiserFormulaireClient() {
+  function reinitialiserClient() {
     setNomClient("");
     setTelephoneClient("");
     setCourrielClient("");
@@ -243,10 +243,12 @@ export default function App() {
       notes: notesClient.trim()
     };
 
+    const enModification = modificationClientId !== null;
+
     setChargement(true);
     setMessage("");
 
-    const resultat = modificationClientId
+    const resultat = enModification
       ? await supabase
           .from("clients")
           .update(client)
@@ -260,10 +262,10 @@ export default function App() {
       return;
     }
 
-    reinitialiserFormulaireClient();
+    reinitialiserClient();
 
     setMessage(
-      modificationClientId
+      enModification
         ? "Client modifié avec succès !"
         : "Client ajouté avec succès !"
     );
@@ -286,11 +288,11 @@ export default function App() {
   }
 
   async function supprimerClient(id) {
-    const confirmation = window.confirm(
-      "Veux-tu vraiment supprimer ce client ?"
-    );
+    if (!window.confirm("Veux-tu vraiment supprimer ce client ?")) {
+      return;
+    }
 
-    if (!confirmation) return;
+    setMessage("");
 
     const { error } = await supabase
       .from("clients")
@@ -299,15 +301,15 @@ export default function App() {
 
     if (error) {
       setMessage(error.message);
-    } else {
-      setMessage("Client supprimé avec succès.");
-
-      if (modificationClientId === id) {
-        reinitialiserFormulaireClient();
-      }
-
-      await chargerClients();
+      return;
     }
+
+    if (modificationClientId === id) {
+      reinitialiserClient();
+    }
+
+    setMessage("Client supprimé avec succès.");
+    await chargerClients();
   }
 
   async function deconnexion() {
@@ -315,13 +317,14 @@ export default function App() {
 
     if (error) {
       setMessage(error.message);
-    } else {
-      setProduits([]);
-      setClients([]);
-      reinitialiserFormulaire();
-      reinitialiserFormulaireClient();
-      setMessage("");
+      return;
     }
+
+    setProduits([]);
+    setClients([]);
+    reinitialiserProduit();
+    reinitialiserClient();
+    setMessage("");
   }
 
   const totalStock = produits.reduce(
@@ -346,6 +349,7 @@ export default function App() {
       <main className="auth-page">
         <section className="auth-card">
           <div className="brand-logo">SP</div>
+
           <h1>SELL PILOT AI</h1>
 
           <p className="auth-subtitle">
@@ -362,6 +366,7 @@ export default function App() {
 
           <form onSubmit={connexion}>
             <label htmlFor="email">Adresse e-mail</label>
+
             <input
               id="email"
               type="email"
@@ -373,6 +378,7 @@ export default function App() {
             />
 
             <label htmlFor="password">Mot de passe</label>
+
             <input
               id="password"
               type="password"
@@ -418,6 +424,7 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="brand-logo">SP</div>
+
           <div>
             <strong>SELL PILOT AI</strong>
             <small>Business Manager</small>
@@ -455,6 +462,7 @@ export default function App() {
         <div className="sidebar-bottom">
           <span>● Connecté</span>
           <small>{user.email}</small>
+
           <button className="logout-button" onClick={deconnexion}>
             Déconnexion
           </button>
@@ -468,6 +476,7 @@ export default function App() {
             <h1>Tableau de bord</h1>
             <p>Bienvenue dans votre espace de gestion.</p>
           </div>
+
           <div className="user-avatar">SP</div>
         </header>
 
@@ -582,7 +591,7 @@ export default function App() {
                 <button
                   type="button"
                   className="cancel-button"
-                  onClick={reinitialiserFormulaire}
+                  onClick={reinitialiserProduit}
                 >
                   Annuler
                 </button>
@@ -625,9 +634,11 @@ export default function App() {
 
                   <div className="product-info">
                     <strong>{produit.nom}</strong>
+
                     <span className="product-price">
                       {formatPrix(Number(produit.prix))}
                     </span>
+
                     <small className="product-stock">
                       Stock : {produit.quantite_stock} unité(s)
                     </small>
@@ -669,7 +680,9 @@ export default function App() {
             onSubmit={enregistrerClient}
           >
             <h3>
-              {modificationClientId ? "Modifier le client" : "Ajouter un client"}
+              {modificationClientId
+                ? "Modifier le client"
+                : "Ajouter un client"}
             </h3>
 
             <div className="form-grid">
@@ -709,4 +722,5 @@ export default function App() {
               <div className="field">
                 <label htmlFor="adresse-client">Adresse</label>
                 <input
-           
+                  id="adresse-client"
+  
