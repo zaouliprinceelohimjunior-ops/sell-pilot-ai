@@ -724,3 +724,119 @@ export default function App() {
                 <input
                   id="adresse-client"
   
+                  placeholder="Adresse du client"
+                  value={adresseClient}
+                  onChange={(e) => setAdresseClient(e.target.value)}
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="notes-client">Notes</label>
+                <input
+                  id="notes-client"
+                  placeholder="Informations complémentaires"
+                  value={notesClient}
+                  onChange={(e) => setNotesClient(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-actions">
+              <button type="submit" disabled={chargement}>
+                {chargement
+                  ? "Enregistrement..."
+                  : modificationClientId
+                    ? "Enregistrer les modifications"
+                    : "+ Ajouter le client"}
+              </button>
+
+              {modificationClientId && (
+                <button
+                  type="button"
+                  className="cancel-button"
+                  onClick={reinitialiserClient}
+                >
+                  Annuler
+                </button>
+              )}
+            </div>
+          </form>
+
+          {message && <p className="notice">{message}</p>}
+
+          <div className="inventory-header">
+            <div>
+              <h3>Mes clients</h3>
+              <p>{clients.length} client(s) enregistré(s)</p>
+            </div>
+
+            <button
+              className="refresh-button"
+              onClick={chargerClients}
+              disabled={chargementClients}
+            >
+              {chargementClients ? "Actualisation..." : "Actualiser"}
+            </button>
+          </div>
+
+          <div className="product-list">
+            {chargementClients && clients.length === 0 ? (
+              <div className="empty-state">Chargement de vos clients...</div>
+            ) : clients.length === 0 ? (
+              <div className="empty-state">
+                <span>♙</span>
+                <h3>Aucun client pour le moment</h3>
+                <p>Ajoutez votre premier client pour commencer.</p>
+              </div>
+            ) : (
+              clients.map((client) => (
+                <article className="product-card" key={client.id}>
+                  <div className="product-icon">♙</div>
+
+                  <div className="product-info">
+                    <strong>{client.nom_complet}</strong>
+                    <span className="product-price">
+                      {client["téléphone"] || "Pas de téléphone"}
+                    </span>
+                    <small className="product-stock">
+                      {client.Courriel || "Pas de courriel"}
+                    </small>
+                    {client.adresse && (
+                      <small className="product-stock">
+                        Adresse : {client.adresse}
+                      </small>
+                    )}
+                    {client.notes && (
+                      <small className="product-stock">
+                        Notes : {client.notes}
+                      </small>
+                    )}
+                  </div>
+
+                  <div className="product-actions">
+                    <button
+                      className="edit-button"
+                      onClick={() => modifierClient(client)}
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      className="delete-button"
+                      onClick={() => supprimerClient(client.id)}
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+
+        <footer className="app-footer">
+          SELL PILOT AI · Gestion intelligente de votre commerce
+        </footer>
+      </main>
+    </div>
+  );
+}
