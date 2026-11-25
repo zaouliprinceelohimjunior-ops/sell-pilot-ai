@@ -20,9 +20,18 @@ export default function App() {
   const [stock, setStock] = useState("");
   const [modificationId, setModificationId] = useState(null);
 
+  const [clients, setClients] = useState([]);
+  const [nomClient, setNomClient] = useState("");
+  const [telephoneClient, setTelephoneClient] = useState("");
+  const [courrielClient, setCourrielClient] = useState("");
+  const [adresseClient, setAdresseClient] = useState("");
+  const [notesClient, setNotesClient] = useState("");
+  const [modificationClientId, setModificationClientId] = useState(null);
+
   const [message, setMessage] = useState("");
   const [chargement, setChargement] = useState(false);
   const [chargementProduits, setChargementProduits] = useState(false);
+  const [chargementClients, setChargementClients] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data, error }) => {
@@ -45,8 +54,10 @@ export default function App() {
   useEffect(() => {
     if (user) {
       chargerProduits();
+      chargerClients();
     } else {
       setProduits([]);
+      setClients([]);
     }
   }, [user]);
 
@@ -64,6 +75,23 @@ export default function App() {
       setMessage(error.message);
     } else {
       setProduits(data || []);
+    }
+  }
+
+  async function chargerClients() {
+    setChargementClients(true);
+
+    const { data, error } = await supabase
+      .from("clients")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    setChargementClients(false);
+
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setClients(data || []);
     }
   }
 
@@ -189,6 +217,99 @@ export default function App() {
     }
   }
 
+  function reinitialiserFormulaireClient() {
+    setNomClient("");
+    setTelephoneClient("");
+    setCourrielClient("");
+    setAdresseClient("");
+    setNotesClient("");
+    setModificationClientId(null);
+  }
+
+  async function enregistrerClient(e) {
+    e.preventDefault();
+
+    if (!nomClient.trim()) {
+      setMessage("Veuillez saisir le nom du client.");
+      return;
+    }
+
+    const client = {
+      user_id: user.id,
+      nom_complet: nomClient.trim(),
+      "téléphone": telephoneClient.trim(),
+      Courriel: courrielClient.trim(),
+      adresse: adresseClient.trim(),
+      notes: notesClient.trim()
+    };
+
+    setChargement(true);
+    setMessage("");
+
+    const resultat = modificationClientId
+      ? await supabase
+          .from("clients")
+          .update(client)
+          .eq("id", modificationClientId)
+      : await supabase.from("clients").insert(client);
+
+    setChargement(false);
+
+    if (resultat.error) {
+      setMessage(resultat.error.message);
+      return;
+    }
+
+    reinitialiserFormulaireClient();
+
+    setMessage(
+      modificationClientId
+        ? "Client modifié avec succès !"
+        : "Client ajouté avec succès !"
+    );
+
+    await chargerClients();
+  }
+
+  function modifierClient(client) {
+    setNomClient(client.nom_complet || "");
+    setTelephoneClient(client["téléphone"] || "");
+    setCourrielClient(client.Courriel || "");
+    setAdresseClient(client.adresse || "");
+    setNotesClient(client.notes || "");
+    setModificationClientId(client.id);
+
+    document.getElementById("formulaire-client")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }
+
+  async function supprimerClient(id) {
+    const confirmation = window.confirm(
+      "Veux-tu vraiment supprimer ce client ?"
+    );
+
+    if (!confirmation) return;
+
+    const { error } = await supabase
+      .from("clients")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setMessage("Client supprimé avec succès.");
+
+      if (modificationClientId === id) {
+        reinitialiserFormulaireClient();
+      }
+
+      await chargerClients();
+    }
+  }
+
   async function deconnexion() {
     const { error } = await supabase.auth.signOut();
 
@@ -196,7 +317,9 @@ export default function App() {
       setMessage(error.message);
     } else {
       setProduits([]);
+      setClients([]);
       reinitialiserFormulaire();
+      reinitialiserFormulaireClient();
       setMessage("");
     }
   }
@@ -223,7 +346,6 @@ export default function App() {
       <main className="auth-page">
         <section className="auth-card">
           <div className="brand-logo">SP</div>
-
           <h1>SELL PILOT AI</h1>
 
           <p className="auth-subtitle">
@@ -240,7 +362,6 @@ export default function App() {
 
           <form onSubmit={connexion}>
             <label htmlFor="email">Adresse e-mail</label>
-
             <input
               id="email"
               type="email"
@@ -252,7 +373,6 @@ export default function App() {
             />
 
             <label htmlFor="password">Mot de passe</label>
-
             <input
               id="password"
               type="password"
@@ -298,7 +418,6 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="brand-logo">SP</div>
-
           <div>
             <strong>SELL PILOT AI</strong>
             <small>Business Manager</small>
@@ -316,9 +435,9 @@ export default function App() {
             <span>▤</span> Produits
           </a>
 
-          <span className="nav-link disabled" aria-disabled="true">
-            <span>♙</span> Clients <small>Bientôt</small>
-          </span>
+          <a className="nav-link" href="#clients">
+            <span>♙</span> Clients
+          </a>
 
           <span className="nav-link disabled" aria-disabled="true">
             <span>▣</span> Commandes <small>Bientôt</small>
@@ -336,7 +455,6 @@ export default function App() {
         <div className="sidebar-bottom">
           <span>● Connecté</span>
           <small>{user.email}</small>
-
           <button className="logout-button" onClick={deconnexion}>
             Déconnexion
           </button>
@@ -350,7 +468,6 @@ export default function App() {
             <h1>Tableau de bord</h1>
             <p>Bienvenue dans votre espace de gestion.</p>
           </div>
-
           <div className="user-avatar">SP</div>
         </header>
 
@@ -383,6 +500,13 @@ export default function App() {
               <h3>{formatPrix(valeurStock)}</h3>
               <small>Prix multiplié par quantités</small>
             </article>
+
+            <article className="stat-card">
+              <span className="stat-icon">♙</span>
+              <p>Clients enregistrés</p>
+              <h3>{clients.length}</h3>
+              <small>Dans votre fichier clients</small>
+            </article>
           </div>
         </section>
 
@@ -401,9 +525,7 @@ export default function App() {
             onSubmit={enregistrerProduit}
           >
             <h3>
-              {modificationId
-                ? "Modifier le produit"
-                : "Ajouter un produit"}
+              {modificationId ? "Modifier le produit" : "Ajouter un produit"}
             </h3>
 
             <div className="form-grid">
@@ -503,11 +625,9 @@ export default function App() {
 
                   <div className="product-info">
                     <strong>{produit.nom}</strong>
-
                     <span className="product-price">
                       {formatPrix(Number(produit.prix))}
                     </span>
-
                     <small className="product-stock">
                       Stock : {produit.quantite_stock} unité(s)
                     </small>
@@ -534,10 +654,59 @@ export default function App() {
           </div>
         </section>
 
-        <footer className="app-footer">
-          SELL PILOT AI · Gestion intelligente de votre commerce
-        </footer>
-      </main>
-    </div>
-  );
-}
+        <section id="clients" className="content-panel">
+          <div className="section-heading">
+            <div>
+              <span className="topbar-label">RELATION CLIENT</span>
+              <h2>Gestion des clients</h2>
+              <p>Enregistrez et retrouvez les informations de vos clients.</p>
+            </div>
+          </div>
+
+          <form
+            id="formulaire-client"
+            className="product-form"
+            onSubmit={enregistrerClient}
+          >
+            <h3>
+              {modificationClientId ? "Modifier le client" : "Ajouter un client"}
+            </h3>
+
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="nom-client">Nom complet</label>
+                <input
+                  id="nom-client"
+                  placeholder="Nom du client"
+                  value={nomClient}
+                  onChange={(e) => setNomClient(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="telephone-client">Téléphone</label>
+                <input
+                  id="telephone-client"
+                  type="tel"
+                  placeholder="Numéro de téléphone"
+                  value={telephoneClient}
+                  onChange={(e) => setTelephoneClient(e.target.value)}
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="courriel-client">Courriel</label>
+                <input
+                  id="courriel-client"
+                  type="email"
+                  placeholder="Adresse e-mail"
+                  value={courrielClient}
+                  onChange={(e) => setCourrielClient(e.target.value)}
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="adresse-client">Adresse</label>
+                <input
+           
