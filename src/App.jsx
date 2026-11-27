@@ -140,14 +140,27 @@ export default function App() {
   }
 
   async function supprimerProduit(id) {
-    if (!window.confirm("Supprimer ce produit ?")) return;
-    const { error } = await supabase.from("produits").delete().eq("id", id);
-    if (error) setError(error.message);
-    else {
-      setMessage("Produit supprimé.");
-      await chargerDonnees();
-    }
+  if (!window.confirm("Supprimer ce produit ?")) return;
+
+  const { data, error } = await supabase
+    .from("produits")
+    .delete()
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    setError(error.message);
+    return;
   }
+
+  if (!data || data.length === 0) {
+    setError("Suppression impossible. Vérifie les autorisations de la table produits.");
+    return;
+  }
+
+  setMessage("Produit supprimé avec succès.");
+  await chargerDonnees();
+}
 
   function viderClient() {
     setNomClient("");
