@@ -8,13 +8,20 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 );
 
+const monnaie = n =>
+  Number(n || 0).toLocaleString("fr-FR") + " F CFA";
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState("dashboard");
+
   const [produits, setProduits] = useState([]);
   const [clients, setClients] = useState([]);
+  const [commandes, setCommandes] = useState([]);
+  const [articles, setArticles] = useState([]);
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -33,6 +40,13 @@ export default function App() {
   const [adresse, setAdresse] = useState("");
   const [notes, setNotes] = useState("");
   const [editClient, setEditClient] = useState(null);
+
+  const [clientCommande, setClientCommande] = useState("");
+  const [modePaiement, setModePaiement] = useState("");
+  const [notesCommande, setNotesCommande] = useState("");
+  const [lignes, setLignes] = useState([
+    { produit_id: "", quantite: 1 }
+  ]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -54,16 +68,55 @@ export default function App() {
     if (user) chargerDonnees();
   }, [user]);
 
+  useEffect(() => {
+    if (user && page === "commandes") chargerCommandes();
+  }, [user, page]);
+
   async function chargerDonnees() {
     setError("");
 
-    const p = await supabase.from("produits").select("*");
+    const p = await supabase.from("produits")
+      .select("*").order("created_at", { ascending: false });
+
     if (p.error) setError("Produits : " + p.error.message);
     else setProduits(p.data || []);
 
-    const c = await supabase.from("clients").select("*");
+    const c = await supabase.from("clients")
+      .select("*").order("nom_complet");
+
     if (c.error) setError("Clients : " + c.error.message);
     else setClients(c.data || []);
+  }
+
+  async function chargerCommandes() {
+    const result = await supabase.from("commandes")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (result.error) {
+      setError("Commandes : " + result.error.message);
+      return;
+    }
+
+    setCommandes(result.data || []);
+
+    const ids = (result.data || []).map(c => c.id);
+
+    if (ids.length === 0) {
+      setArticles([]);
+      return;
+    }
+
+    const detail = await supabase.from("commande_articles")
+      .select("*")
+      .in("commande_id", ids);
+
+    if (detail.error) {
+      setError("Articles : " + detail.error.message);
+      return;
+    }
+
+    setArticles(detail.data || []);
   }
 
   async function authentifier(e) {
@@ -111,13 +164,15 @@ export default function App() {
     setMessage("");
 
     const donnees = {
+      user_id: user.id,
       nom: nomProduit.trim(),
       prix: Number(prixProduit),
       quantite_stock: Number(stockProduit)
     };
 
     const result = editProduit
-      ? await supabase.from("produits").update(donnees).eq("id", editProduit)
+      ? await supabase.from("produits")
+          .update(donnees).eq("id", editProduit)
       : await supabase.from("produits").insert([donnees]);
 
     if (result.error) {
@@ -140,27 +195,27 @@ export default function App() {
   }
 
   async function supprimerProduit(id) {
-  if (!window.confirm("Supprimer ce produit ?")) return;
+    if (!window.confirm("Supprimer ce produit ?")) return;
 
-  const { data, error } = await supabase
-    .from("produits")
-    .delete()
-    .eq("id", id)
-    .select("id");
+    const { data, error } = await supabase
+      .from("produits")
+      .delete()
+      .eq("id", id)
+      .select("id");
 
-  if (error) {
-    setError(error.message);
-    return;
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      setError("Suppression impossible. Vérifie les autorisations.");
+      return;
+    }
+
+    setMessage("Produit supprimé avec succès.");
+    await chargerDonnees();
   }
-
-  if (!data || data.length === 0) {
-    setError("Suppression impossible. Vérifie les autorisations de la table produits.");
-    return;
-  }
-
-  setMessage("Produit supprimé avec succès.");
-  await chargerDonnees();
-}
 
   function viderClient() {
     setNomClient("");
@@ -187,10 +242,8 @@ export default function App() {
     };
 
     const result = editClient
-      ? await supabase
-          .from("clients")
-          .update(donnees)
-          .eq("id", editClient)
+      ? await supabase.from("clients")
+          .update(donnees).eq("id", editClient)
       : await supabase.from("clients").insert([donnees]);
 
     if (result.error) {
@@ -216,7 +269,9 @@ export default function App() {
 
   async function supprimerClient(id) {
     if (!window.confirm("Supprimer ce client ?")) return;
-    const { error } = await supabase.from("clients").delete().eq("id", id);
+
+    const { error } = await supabase.from("clients")
+      .delete().eq("id", id);
 
     if (error) setError(error.message);
     else {
@@ -225,14 +280,96 @@ export default function App() {
     }
   }
 
+  function ajouterLigne() {
+    setLignes([...lignes, { produit_id: "", quantite: 1 }]);
+  }
+
+  function modifierLigne(index, champ, valeur) {
+    setLignes(lignes.map((ligne, i) =>
+      i === index ? { ...ligne, [champ]: valeur } : ligne
+    ));
+  }
+
+  function supprimerLigne(index) {
+    if (lignes.length === 1) {
+      setLignes([{ produit_id: "", quantite: 1 }]);
+    } else {
+      setLignes(lignes.filter((_, i) => i !== index));
+    }
+  }
+
+  const totalCommande = lignes.reduce((total, ligne) => {
+    const p = produits.find(x => x.id === ligne.produit_id);
+    return total + (p ? Number(p.prix) * Number(ligne.quantite || 0) : 0);
+  }, 0);
+
+  async function enregistrerCommande(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    if (!clientCommande) {
+      setError("Choisis un client.");
+      setBusy(false);
+      return;
+    }
+
+    const articlesCommande = lignes.map(l => ({
+      produit_id: l.produit_id,
+      quantite: Number(l.quantite)
+    }));
+
+    if (articlesCommande.some(a => !a.produit_id || a.quantite <= 0)) {
+      setError("Vérifie les produits et les quantités.");
+      setBusy(false);
+      return;
+    }
+
+    const ids = articlesCommande.map(a => a.produit_id);
+
+    if (new Set(ids).size !== ids.length) {
+      setError("Un même produit ne doit pas être ajouté deux fois. Modifie sa quantité.");
+      setBusy(false);
+      return;
+    }
+
+    const { error } = await supabase.rpc("creer_commande", {
+      p_client_id: clientCommande,
+      p_articles: articlesCommande,
+      p_mode_paiement: modePaiement || null,
+      p_notes: notesCommande.trim() || null
+    });
+
+    if (error) {
+      setError("Commande : " + error.message);
+    } else {
+      setMessage("Commande enregistrée avec succès. Le stock a été mis à jour.");
+      setClientCommande("");
+      setModePaiement("");
+      setNotesCommande("");
+      setLignes([{ produit_id: "", quantite: 1 }]);
+      await chargerDonnees();
+      await chargerCommandes();
+    }
+
+    setBusy(false);
+  }
+
+  function nomDuProduit(id) {
+    return produits.find(p => p.id === id)?.nom || "Produit";
+  }
+
+  function nomDuClient(id) {
+    return clients.find(c => c.id === id)?.nom_complet || "Client";
+  }
+
   const totalStock = produits.reduce(
-    (s, p) => s + Number(p.quantite_stock || 0),
-    0
+    (s, p) => s + Number(p.quantite_stock || 0), 0
   );
 
   const valeurStock = produits.reduce(
-    (s, p) => s + Number(p.prix || 0) * Number(p.quantite_stock || 0),
-    0
+    (s, p) => s + Number(p.prix || 0) * Number(p.quantite_stock || 0), 0
   );
 
   if (loading) {
@@ -246,26 +383,17 @@ export default function App() {
           <div className="logo">SP</div>
           <h1>SELL PILOT AI</h1>
           <p className="muted">La gestion intelligente de votre commerce.</p>
-
           <h2>{inscription ? "Créer un compte" : "Connexion"}</h2>
 
           <label>Adresse e-mail</label>
-          <input
-            type="email"
-            required
-            value={connexionEmail}
+          <input type="email" required value={connexionEmail}
             onChange={e => setConnexionEmail(e.target.value)}
-            placeholder="Votre adresse e-mail"
-          />
+            placeholder="Votre adresse e-mail" />
 
           <label>Mot de passe</label>
-          <input
-            type="password"
-            required
-            value={password}
+          <input type="password" required value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="Votre mot de passe"
-          />
+            placeholder="Votre mot de passe" />
 
           {error && <div className="alert error">{error}</div>}
           {message && <div className="alert success">{message}</div>}
@@ -274,15 +402,12 @@ export default function App() {
             {busy ? "Patientez..." : inscription ? "Créer mon compte" : "Se connecter"}
           </button>
 
-          <button
-            type="button"
-            className="text-button"
+          <button type="button" className="text-button"
             onClick={() => {
               setInscription(!inscription);
               setError("");
               setMessage("");
-            }}
-          >
+            }}>
             {inscription ? "J'ai déjà un compte" : "Créer un nouveau compte"}
           </button>
         </form>
@@ -312,15 +437,13 @@ export default function App() {
 
         <nav className="side-nav">
           {menus.map(([id, label]) => (
-            <button
-              key={id}
+            <button key={id}
               className={page === id ? "nav-item selected" : "nav-item"}
               onClick={() => {
                 setPage(id);
                 setError("");
                 setMessage("");
-              }}
-            >
+              }}>
               {label}
             </button>
           ))}
@@ -356,20 +479,16 @@ export default function App() {
 
             <section className="stats">
               <div className="stat">
-                <span>Produits</span>
-                <strong>{produits.length}</strong>
+                <span>Produits</span><strong>{produits.length}</strong>
               </div>
               <div className="stat">
-                <span>Clients</span>
-                <strong>{clients.length}</strong>
+                <span>Clients</span><strong>{clients.length}</strong>
               </div>
               <div className="stat">
-                <span>Unités en stock</span>
-                <strong>{totalStock}</strong>
+                <span>Unités en stock</span><strong>{totalStock}</strong>
               </div>
               <div className="stat">
-                <span>Valeur du stock</span>
-                <strong>{valeurStock.toLocaleString("fr-FR")} F CFA</strong>
+                <span>Valeur du stock</span><strong>{monnaie(valeurStock)}</strong>
               </div>
             </section>
 
@@ -382,6 +501,9 @@ export default function App() {
                 <button className="secondary" onClick={() => setPage("clients")}>
                   + Ajouter un client
                 </button>
+                <button className="secondary" onClick={() => setPage("commandes")}>
+                  + Créer une commande
+                </button>
               </div>
             </section>
           </>
@@ -392,13 +514,17 @@ export default function App() {
             <h2>{editProduit ? "Modifier le produit" : "Ajouter un produit"}</h2>
             <form className="data-form" onSubmit={enregistrerProduit}>
               <label>Nom du produit</label>
-              <input required value={nomProduit} onChange={e => setNomProduit(e.target.value)} placeholder="Nom du produit" />
+              <input required value={nomProduit}
+                onChange={e => setNomProduit(e.target.value)}
+                placeholder="Nom du produit" />
 
               <label>Prix</label>
-              <input required type="number" min="0" value={prixProduit} onChange={e => setPrixProduit(e.target.value)} placeholder="Prix" />
+              <input required type="number" min="0" value={prixProduit}
+                onChange={e => setPrixProduit(e.target.value)} placeholder="Prix" />
 
               <label>Quantité en stock</label>
-              <input required type="number" min="0" value={stockProduit} onChange={e => setStockProduit(e.target.value)} placeholder="Quantité" />
+              <input required type="number" min="0" value={stockProduit}
+                onChange={e => setStockProduit(e.target.value)} placeholder="Quantité" />
 
               <button className="primary" disabled={busy}>
                 {busy ? "Enregistrement..." : editProduit ? "Enregistrer les modifications" : "Ajouter le produit"}
@@ -412,7 +538,7 @@ export default function App() {
               <article className="record" key={p.id}>
                 <div>
                   <strong>{p.nom}</strong>
-                  <p>{Number(p.prix).toLocaleString("fr-FR")} F CFA · Stock : {p.quantite_stock}</p>
+                  <p>{monnaie(p.prix)} · Stock : {p.quantite_stock}</p>
                 </div>
                 <div className="record-actions">
                   <button onClick={() => modifierProduit(p)}>Modifier</button>
@@ -429,19 +555,24 @@ export default function App() {
             <h2>{editClient ? "Modifier le client" : "Ajouter un client"}</h2>
             <form className="data-form" onSubmit={enregistrerClient}>
               <label>Nom complet</label>
-              <input required value={nomClient} onChange={e => setNomClient(e.target.value)} placeholder="Nom du client" />
+              <input required value={nomClient}
+                onChange={e => setNomClient(e.target.value)} placeholder="Nom du client" />
 
               <label>Téléphone</label>
-              <input value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="Numéro de téléphone" />
+              <input value={telephone}
+                onChange={e => setTelephone(e.target.value)} placeholder="Numéro de téléphone" />
 
               <label>Courriel</label>
-              <input type="email" value={courriel} onChange={e => setCourriel(e.target.value)} placeholder="Adresse e-mail" />
+              <input type="email" value={courriel}
+                onChange={e => setCourriel(e.target.value)} placeholder="Adresse e-mail" />
 
               <label>Adresse</label>
-              <input value={adresse} onChange={e => setAdresse(e.target.value)} placeholder="Adresse du client" />
+              <input value={adresse}
+                onChange={e => setAdresse(e.target.value)} placeholder="Adresse du client" />
 
               <label>Notes</label>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Informations supplémentaires" />
+              <textarea value={notes}
+                onChange={e => setNotes(e.target.value)} placeholder="Informations supplémentaires" />
 
               <button className="primary" disabled={busy}>
                 {busy ? "Enregistrement..." : editClient ? "Enregistrer les modifications" : "Enregistrer le client"}
@@ -469,13 +600,36 @@ export default function App() {
           </section>
         )}
 
-        {["commandes", "ventes", "factures"].includes(page) && (
-          <section className="panel">
-            <h2>Fonctionnalité en préparation</h2>
-            <p className="muted">Cette partie sera ajoutée prochainement.</p>
-          </section>
-        )}
-      </main>
-    </div>
-  );
-}
+        {page === "commandes" && (
+          <>
+            <section className="panel">
+              <h2>Créer une nouvelle commande</h2>
+
+              {clients.length === 0 ? (
+                <p className="muted">Ajoute d'abord un client dans la rubrique Clients.</p>
+              ) : produits.length === 0 ? (
+                <p className="muted">Ajoute d'abord des produits dans la rubrique Produits.</p>
+              ) : (
+                <form className="data-form" onSubmit={enregistrerCommande}>
+                  <label>Choisir le client</label>
+                  <select required value={clientCommande}
+                    onChange={e => setClientCommande(e.target.value)}>
+                    <option value="">Sélectionner un client</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.nom_complet}</option>
+                    ))}
+                  </select>
+
+                  <h3>Produits de la commande</h3>
+
+                  {lignes.map((ligne, index) => {
+                    const produit = produits.find(p => p.id === ligne.produit_id);
+                    return (
+                      <div className="panel" key={index}>
+                        <label>Produit {index + 1}</label>
+                        <select required value={ligne.produit_id}
+                          onChange={e => modifierLigne(index, "produit_id", e.target.value)}>
+                          <option value="">Choisir un produit</option>
+                          {produits.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.nom} — {monnaie
