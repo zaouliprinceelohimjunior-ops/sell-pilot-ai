@@ -8,7 +8,7 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 );
 
-const monnaie = n =>
+const monnaie = (n) =>
   Number(n || 0).toLocaleString("fr-FR") + " F CFA";
 
 export default function App() {
@@ -49,23 +49,35 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    let actif = true;
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!actif) return;
+      if (error) setError(error.message);
       setUser(data.session?.user ?? null);
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+    const { data: listener } =
+      supabase.auth.onAuthStateChange((_event, session) => {
         setUser(session?.user ?? null);
         setLoading(false);
-      }
-    );
+      });
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      actif = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
     if (user) chargerDonnees();
+    else {
+      setProduits([]);
+      setClients([]);
+      setCommandes([]);
+      setArticles([]);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -75,21 +87,26 @@ export default function App() {
   async function chargerDonnees() {
     setError("");
 
-    const p = await supabase.from("produits")
-      .select("*").order("created_at", { ascending: false });
+    const p = await supabase
+      .from("produits")
+      .select("*")
+      .order("created_at", { ascending: false });
 
     if (p.error) setError("Produits : " + p.error.message);
     else setProduits(p.data || []);
 
-    const c = await supabase.from("clients")
-      .select("*").order("nom_complet");
+    const c = await supabase
+      .from("clients")
+      .select("*")
+      .order("nom_complet");
 
     if (c.error) setError("Clients : " + c.error.message);
     else setClients(c.data || []);
   }
 
   async function chargerCommandes() {
-    const result = await supabase.from("commandes")
+    const result = await supabase
+      .from("commandes")
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -107,7 +124,8 @@ export default function App() {
       return;
     }
 
-    const detail = await supabase.from("commande_articles")
+    const detail = await supabase
+      .from("commande_articles")
       .select("*")
       .in("commande_id", ids);
 
@@ -125,29 +143,38 @@ export default function App() {
     setError("");
     setMessage("");
 
-    const result = inscription
-      ? await supabase.auth.signUp({
-          email: connexionEmail.trim(),
-          password
-        })
-      : await supabase.auth.signInWithPassword({
-          email: connexionEmail.trim(),
-          password
-        });
+    try {
+      const result = inscription
+        ? await supabase.auth.signUp({
+            email: connexionEmail.trim(),
+            password
+          })
+        : await supabase.auth.signInWithPassword({
+            email: connexionEmail.trim(),
+            password
+          });
 
-    if (result.error) setError(result.error.message);
-    else if (inscription) {
-      setMessage("Inscription envoyée. Vérifie ton e-mail si demandé.");
-    } else {
-      setMessage("Connexion réussie.");
+      if (result.error) {
+        setError(result.error.message);
+      } else if (inscription) {
+        setMessage(
+          "Inscription envoyée. Vérifie ton e-mail si demandé."
+        );
+      } else {
+        setMessage("Connexion réussie.");
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
     }
-
-    setBusy(false);
   }
 
   async function deconnexion() {
+    setBusy(true);
     const { error } = await supabase.auth.signOut();
     if (error) setError(error.message);
+    setBusy(false);
   }
 
   function viderProduit() {
@@ -163,27 +190,35 @@ export default function App() {
     setError("");
     setMessage("");
 
-    const donnees = {
-      user_id: user.id,
-      nom: nomProduit.trim(),
-      prix: Number(prixProduit),
-      quantite_stock: Number(stockProduit)
-    };
+    try {
+      const donnees = {
+        user_id: user.id,
+        nom: nomProduit.trim(),
+        prix: Number(prixProduit),
+        quantite_stock: Number(stockProduit)
+      };
 
-    const result = editProduit
-      ? await supabase.from("produits")
-          .update(donnees).eq("id", editProduit)
-      : await supabase.from("produits").insert([donnees]);
+      const result = editProduit
+        ? await supabase
+            .from("produits")
+            .update(donnees)
+            .eq("id", editProduit)
+        : await supabase
+            .from("produits")
+            .insert([donnees]);
 
-    if (result.error) {
-      setError("Produit : " + result.error.message);
-    } else {
-      setMessage("Produit enregistré avec succès.");
-      viderProduit();
-      await chargerDonnees();
+      if (result.error) {
+        setError("Produit : " + result.error.message);
+      } else {
+        setMessage("Produit enregistré avec succès.");
+        viderProduit();
+        await chargerDonnees();
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
     }
-
-    setBusy(false);
   }
 
   function modifierProduit(p) {
@@ -197,6 +232,7 @@ export default function App() {
   async function supprimerProduit(id) {
     if (!window.confirm("Supprimer ce produit ?")) return;
 
+    setError("");
     const { data, error } = await supabase
       .from("produits")
       .delete()
@@ -232,29 +268,37 @@ export default function App() {
     setError("");
     setMessage("");
 
-    const donnees = {
-      user_id: user.id,
-      nom_complet: nomClient.trim(),
-      telephone: telephone.trim(),
-      email: courriel.trim(),
-      adresse: adresse.trim(),
-      notes: notes.trim()
-    };
+    try {
+      const donnees = {
+        user_id: user.id,
+        nom_complet: nomClient.trim(),
+        telephone: telephone.trim(),
+        email: courriel.trim(),
+        adresse: adresse.trim(),
+        notes: notes.trim()
+      };
 
-    const result = editClient
-      ? await supabase.from("clients")
-          .update(donnees).eq("id", editClient)
-      : await supabase.from("clients").insert([donnees]);
+      const result = editClient
+        ? await supabase
+            .from("clients")
+            .update(donnees)
+            .eq("id", editClient)
+        : await supabase
+            .from("clients")
+            .insert([donnees]);
 
-    if (result.error) {
-      setError("Client : " + result.error.message);
-    } else {
-      setMessage("Client enregistré avec succès.");
-      viderClient();
-      await chargerDonnees();
+      if (result.error) {
+        setError("Client : " + result.error.message);
+      } else {
+        setMessage("Client enregistré avec succès.");
+        viderClient();
+        await chargerDonnees();
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
     }
-
-    setBusy(false);
   }
 
   function modifierClient(c) {
@@ -270,23 +314,31 @@ export default function App() {
   async function supprimerClient(id) {
     if (!window.confirm("Supprimer ce client ?")) return;
 
-    const { error } = await supabase.from("clients")
-      .delete().eq("id", id);
+    const { error } = await supabase
+      .from("clients")
+      .delete()
+      .eq("id", id);
 
-    if (error) setError(error.message);
-    else {
+    if (error) {
+      setError(error.message);
+    } else {
       setMessage("Client supprimé.");
       await chargerDonnees();
     }
   }
 
   function ajouterLigne() {
-    setLignes([...lignes, { produit_id: "", quantite: 1 }]);
+    setLignes([
+      ...lignes,
+      { produit_id: "", quantite: 1 }
+    ]);
   }
 
   function modifierLigne(index, champ, valeur) {
     setLignes(lignes.map((ligne, i) =>
-      i === index ? { ...ligne, [champ]: valeur } : ligne
+      i === index
+        ? { ...ligne, [champ]: valeur }
+        : ligne
     ));
   }
 
@@ -300,7 +352,11 @@ export default function App() {
 
   const totalCommande = lignes.reduce((total, ligne) => {
     const p = produits.find(x => x.id === ligne.produit_id);
-    return total + (p ? Number(p.prix) * Number(ligne.quantite || 0) : 0);
+    return total + (
+      p
+        ? Number(p.prix) * Number(ligne.quantite || 0)
+        : 0
+    );
   }, 0);
 
   async function enregistrerCommande(e) {
@@ -309,51 +365,60 @@ export default function App() {
     setError("");
     setMessage("");
 
-    if (!clientCommande) {
-      setError("Choisis un client.");
+    try {
+      if (!clientCommande) {
+        setError("Choisis un client.");
+        return;
+      }
+
+      const articlesCommande = lignes.map(l => ({
+        produit_id: l.produit_id,
+        quantite: Number(l.quantite)
+      }));
+
+      if (
+        articlesCommande.some(
+          a => !a.produit_id || !Number.isInteger(a.quantite) || a.quantite <= 0
+        )
+      ) {
+        setError("Vérifie les produits et les quantités.");
+        return;
+      }
+
+      const ids = articlesCommande.map(a => a.produit_id);
+
+      if (new Set(ids).size !== ids.length) {
+        setError(
+          "Un même produit ne doit pas être ajouté deux fois. Modifie sa quantité."
+        );
+        return;
+      }
+
+      const { error } = await supabase.rpc("creer_commande", {
+        p_client_id: clientCommande,
+        p_articles: articlesCommande,
+        p_mode_paiement: modePaiement || null,
+        p_notes: notesCommande.trim() || null
+      });
+
+      if (error) {
+        setError("Commande : " + error.message);
+      } else {
+        setMessage(
+          "Commande enregistrée avec succès. Le stock a été mis à jour."
+        );
+        setClientCommande("");
+        setModePaiement("");
+        setNotesCommande("");
+        setLignes([{ produit_id: "", quantite: 1 }]);
+        await chargerDonnees();
+        await chargerCommandes();
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
       setBusy(false);
-      return;
     }
-
-    const articlesCommande = lignes.map(l => ({
-      produit_id: l.produit_id,
-      quantite: Number(l.quantite)
-    }));
-
-    if (articlesCommande.some(a => !a.produit_id || a.quantite <= 0)) {
-      setError("Vérifie les produits et les quantités.");
-      setBusy(false);
-      return;
-    }
-
-    const ids = articlesCommande.map(a => a.produit_id);
-
-    if (new Set(ids).size !== ids.length) {
-      setError("Un même produit ne doit pas être ajouté deux fois. Modifie sa quantité.");
-      setBusy(false);
-      return;
-    }
-
-    const { error } = await supabase.rpc("creer_commande", {
-      p_client_id: clientCommande,
-      p_articles: articlesCommande,
-      p_mode_paiement: modePaiement || null,
-      p_notes: notesCommande.trim() || null
-    });
-
-    if (error) {
-      setError("Commande : " + error.message);
-    } else {
-      setMessage("Commande enregistrée avec succès. Le stock a été mis à jour.");
-      setClientCommande("");
-      setModePaiement("");
-      setNotesCommande("");
-      setLignes([{ produit_id: "", quantite: 1 }]);
-      await chargerDonnees();
-      await chargerCommandes();
-    }
-
-    setBusy(false);
   }
 
   function nomDuProduit(id) {
@@ -365,55 +430,15 @@ export default function App() {
   }
 
   const totalStock = produits.reduce(
-    (s, p) => s + Number(p.quantite_stock || 0), 0
+    (s, p) => s + Number(p.quantite_stock || 0),
+    0
   );
 
   const valeurStock = produits.reduce(
-    (s, p) => s + Number(p.prix || 0) * Number(p.quantite_stock || 0), 0
+    (s, p) =>
+      s + Number(p.prix || 0) * Number(p.quantite_stock || 0),
+    0
   );
-
-  if (loading) {
-    return <div className="loading-screen">SELL PILOT AI · Chargement...</div>;
-  }
-
-  if (!user) {
-    return (
-      <div className="auth-page">
-        <form className="auth-card" onSubmit={authentifier}>
-          <div className="logo">SP</div>
-          <h1>SELL PILOT AI</h1>
-          <p className="muted">La gestion intelligente de votre commerce.</p>
-          <h2>{inscription ? "Créer un compte" : "Connexion"}</h2>
-
-          <label>Adresse e-mail</label>
-          <input type="email" required value={connexionEmail}
-            onChange={e => setConnexionEmail(e.target.value)}
-            placeholder="Votre adresse e-mail" />
-
-          <label>Mot de passe</label>
-          <input type="password" required value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Votre mot de passe" />
-
-          {error && <div className="alert error">{error}</div>}
-          {message && <div className="alert success">{message}</div>}
-
-          <button className="primary" disabled={busy}>
-            {busy ? "Patientez..." : inscription ? "Créer mon compte" : "Se connecter"}
-          </button>
-
-          <button type="button" className="text-button"
-            onClick={() => {
-              setInscription(!inscription);
-              setError("");
-              setMessage("");
-            }}>
-            {inscription ? "J'ai déjà un compte" : "Créer un nouveau compte"}
-          </button>
-        </form>
-      </div>
-    );
-  }
 
   const menus = [
     ["dashboard", "Tableau de bord"],
@@ -423,6 +448,73 @@ export default function App() {
     ["ventes", "Ventes"],
     ["factures", "Factures"]
   ];
+
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        SELL PILOT AI · Chargement...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="auth-page">
+        <form className="auth-card" onSubmit={authentifier}>
+          <div className="logo">SP</div>
+          <h1>SELL PILOT AI</h1>
+          <p className="muted">
+            La gestion intelligente de votre commerce.
+          </p>
+
+          <h2>{inscription ? "Créer un compte" : "Connexion"}</h2>
+
+          <label>Adresse e-mail</label>
+          <input
+            type="email"
+            required
+            value={connexionEmail}
+            onChange={e => setConnexionEmail(e.target.value)}
+            placeholder="Votre adresse e-mail"
+          />
+
+          <label>Mot de passe</label>
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Votre mot de passe"
+          />
+
+          {error && <div className="alert error">{error}</div>}
+          {message && <div className="alert success">{message}</div>}
+
+          <button className="primary" disabled={busy}>
+            {busy
+              ? "Patientez..."
+              : inscription
+                ? "Créer mon compte"
+                : "Se connecter"}
+          </button>
+
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => {
+              setInscription(!inscription);
+              setError("");
+              setMessage("");
+            }}
+          >
+            {inscription
+              ? "J'ai déjà un compte"
+              : "Créer un nouveau compte"}
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="app-layout">
@@ -437,13 +529,17 @@ export default function App() {
 
         <nav className="side-nav">
           {menus.map(([id, label]) => (
-            <button key={id}
-              className={page === id ? "nav-item selected" : "nav-item"}
+            <button
+              key={id}
+              className={
+                page === id ? "nav-item selected" : "nav-item"
+              }
               onClick={() => {
                 setPage(id);
                 setError("");
                 setMessage("");
-              }}>
+              }}
+            >
               {label}
             </button>
           ))}
@@ -451,7 +547,11 @@ export default function App() {
 
         <div className="account">
           <span>{user.email}</span>
-          <button className="logout" onClick={deconnexion}>
+          <button
+            className="logout"
+            onClick={deconnexion}
+            disabled={busy}
+          >
             Déconnexion
           </button>
         </div>
@@ -474,34 +574,49 @@ export default function App() {
             <section className="hero">
               <span>BIENVENUE SUR SELL PILOT AI</span>
               <h2>Pilotez votre commerce avec confiance.</h2>
-              <p>Vos produits et vos clients réunis dans un seul espace.</p>
+              <p>
+                Vos produits et vos clients réunis dans un seul espace.
+              </p>
             </section>
 
             <section className="stats">
               <div className="stat">
-                <span>Produits</span><strong>{produits.length}</strong>
+                <span>Produits</span>
+                <strong>{produits.length}</strong>
               </div>
               <div className="stat">
-                <span>Clients</span><strong>{clients.length}</strong>
+                <span>Clients</span>
+                <strong>{clients.length}</strong>
               </div>
               <div className="stat">
-                <span>Unités en stock</span><strong>{totalStock}</strong>
+                <span>Unités en stock</span>
+                <strong>{totalStock}</strong>
               </div>
               <div className="stat">
-                <span>Valeur du stock</span><strong>{monnaie(valeurStock)}</strong>
+                <span>Valeur du stock</span>
+                <strong>{monnaie(valeurStock)}</strong>
               </div>
             </section>
 
             <section className="panel">
               <h2>Accès rapide</h2>
               <div className="quick-actions">
-                <button className="primary" onClick={() => setPage("produits")}>
+                <button
+                  className="primary"
+                  onClick={() => setPage("produits")}
+                >
                   + Ajouter un produit
                 </button>
-                <button className="secondary" onClick={() => setPage("clients")}>
+                <button
+                  className="secondary"
+                  onClick={() => setPage("clients")}
+                >
                   + Ajouter un client
                 </button>
-                <button className="secondary" onClick={() => setPage("commandes")}>
+                <button
+                  className="secondary"
+                  onClick={() => setPage("commandes")}
+                >
                   + Créer une commande
                 </button>
               </div>
@@ -511,125 +626,132 @@ export default function App() {
 
         {page === "produits" && (
           <section className="panel">
-            <h2>{editProduit ? "Modifier le produit" : "Ajouter un produit"}</h2>
+            <h2>
+              {editProduit ? "Modifier le produit" : "Ajouter un produit"}
+            </h2>
+
             <form className="data-form" onSubmit={enregistrerProduit}>
               <label>Nom du produit</label>
-              <input required value={nomProduit}
+              <input
+                required
+                value={nomProduit}
                 onChange={e => setNomProduit(e.target.value)}
-                placeholder="Nom du produit" />
+                placeholder="Nom du produit"
+              />
 
               <label>Prix</label>
-              <input required type="number" min="0" value={prixProduit}
-                onChange={e => setPrixProduit(e.target.value)} placeholder="Prix" />
+              <input
+                required
+                type="number"
+                min="0"
+                value={prixProduit}
+                onChange={e => setPrixProduit(e.target.value)}
+                placeholder="Prix"
+              />
 
               <label>Quantité en stock</label>
-              <input required type="number" min="0" value={stockProduit}
-                onChange={e => setStockProduit(e.target.value)} placeholder="Quantité" />
+              <input
+                required
+                type="number"
+                min="0"
+                value={stockProduit}
+                onChange={e => setStockProduit(e.target.value)}
+                placeholder="Quantité"
+              />
 
               <button className="primary" disabled={busy}>
-                {busy ? "Enregistrement..." : editProduit ? "Enregistrer les modifications" : "Ajouter le produit"}
+                {busy
+                  ? "Enregistrement..."
+                  : editProduit
+                    ? "Enregistrer les modifications"
+                    : "Ajouter le produit"}
               </button>
 
-              {editProduit && <button type="button" className="secondary" onClick={viderProduit}>Annuler</button>}
+              {editProduit && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={viderProduit}
+                >
+                  Annuler
+                </button>
+              )}
             </form>
 
             <h2 className="section-title">Liste des produits</h2>
+
             {produits.map(p => (
               <article className="record" key={p.id}>
                 <div>
                   <strong>{p.nom}</strong>
-                  <p>{monnaie(p.prix)} · Stock : {p.quantite_stock}</p>
+                  <p>
+                    {monnaie(p.prix)} · Stock : {p.quantite_stock}
+                  </p>
                 </div>
+
                 <div className="record-actions">
-                  <button onClick={() => modifierProduit(p)}>Modifier</button>
-                  <button className="danger-button" onClick={() => supprimerProduit(p.id)}>Supprimer</button>
+                  <button onClick={() => modifierProduit(p)}>
+                    Modifier
+                  </button>
+                  <button
+                    className="danger-button"
+                    onClick={() => supprimerProduit(p.id)}
+                  >
+                    Supprimer
+                  </button>
                 </div>
               </article>
             ))}
-            {produits.length === 0 && <p className="muted">Aucun produit enregistré.</p>}
+
+            {produits.length === 0 && (
+              <p className="muted">Aucun produit enregistré.</p>
+            )}
           </section>
         )}
 
         {page === "clients" && (
           <section className="panel">
-            <h2>{editClient ? "Modifier le client" : "Ajouter un client"}</h2>
+            <h2>
+              {editClient ? "Modifier le client" : "Ajouter un client"}
+            </h2>
+
             <form className="data-form" onSubmit={enregistrerClient}>
               <label>Nom complet</label>
-              <input required value={nomClient}
-                onChange={e => setNomClient(e.target.value)} placeholder="Nom du client" />
+              <input
+                required
+                value={nomClient}
+                onChange={e => setNomClient(e.target.value)}
+                placeholder="Nom du client"
+              />
 
               <label>Téléphone</label>
-              <input value={telephone}
-                onChange={e => setTelephone(e.target.value)} placeholder="Numéro de téléphone" />
+              <input
+                value={telephone}
+                onChange={e => setTelephone(e.target.value)}
+                placeholder="Numéro de téléphone"
+              />
 
               <label>Courriel</label>
-              <input type="email" value={courriel}
-                onChange={e => setCourriel(e.target.value)} placeholder="Adresse e-mail" />
+              <input
+                type="email"
+                value={courriel}
+                onChange={e => setCourriel(e.target.value)}
+                placeholder="Adresse e-mail"
+              />
 
               <label>Adresse</label>
-              <input value={adresse}
-                onChange={e => setAdresse(e.target.value)} placeholder="Adresse du client" />
+              <input
+                value={adresse}
+                onChange={e => setAdresse(e.target.value)}
+                placeholder="Adresse du client"
+              />
 
               <label>Notes</label>
-              <textarea value={notes}
-                onChange={e => setNotes(e.target.value)} placeholder="Informations supplémentaires" />
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Informations supplémentaires"
+              />
 
               <button className="primary" disabled={busy}>
-                {busy ? "Enregistrement..." : editClient ? "Enregistrer les modifications" : "Enregistrer le client"}
-              </button>
-
-              {editClient && <button type="button" className="secondary" onClick={viderClient}>Annuler</button>}
-            </form>
-
-            <h2 className="section-title">Liste des clients</h2>
-            {clients.map(c => (
-              <article className="record" key={c.id}>
-                <div>
-                  <strong>{c.nom_complet}</strong>
-                  <p>{c.telephone || "Pas de téléphone"}</p>
-                  <p>{c.email || "Pas de courriel"}</p>
-                  <p>{c.adresse || ""}</p>
-                </div>
-                <div className="record-actions">
-                  <button onClick={() => modifierClient(c)}>Modifier</button>
-                  <button className="danger-button" onClick={() => supprimerClient(c.id)}>Supprimer</button>
-                </div>
-              </article>
-            ))}
-            {clients.length === 0 && <p className="muted">Aucun client enregistré.</p>}
-          </section>
-        )}
-
-        {page === "commandes" && (
-          <>
-            <section className="panel">
-              <h2>Créer une nouvelle commande</h2>
-
-              {clients.length === 0 ? (
-                <p className="muted">Ajoute d'abord un client dans la rubrique Clients.</p>
-              ) : produits.length === 0 ? (
-                <p className="muted">Ajoute d'abord des produits dans la rubrique Produits.</p>
-              ) : (
-                <form className="data-form" onSubmit={enregistrerCommande}>
-                  <label>Choisir le client</label>
-                  <select required value={clientCommande}
-                    onChange={e => setClientCommande(e.target.value)}>
-                    <option value="">Sélectionner un client</option>
-                    {clients.map(c => (
-                      <option key={c.id} value={c.id}>{c.nom_complet}</option>
-                    ))}
-                  </select>
-
-                  <h3>Produits de la commande</h3>
-
-                  {lignes.map((ligne, index) => {
-                    const produit = produits.find(p => p.id === ligne.produit_id);
-                    return (
-                      <div className="panel" key={index}>
-                        <label>Produit {index + 1}</label>
-                        <select required value={ligne.produit_id}
-                          onChange={e => modifierLigne(index, "produit_id", e.target.value)}>
-                          <option value="">Choisir un produit</option>
-                          {produits.map(p => (
-                            <option key={p.id} value={p.id}>
-                              {p.nom} — {monnaie
+                
