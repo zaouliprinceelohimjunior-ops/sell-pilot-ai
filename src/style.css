@@ -7,6 +7,7 @@
   font-family: Inter, Arial, sans-serif;
   color: #17233b;
   background: #f4f6fb;
+  font-synthesis: none;
 }
 
 body {
@@ -15,12 +16,16 @@ body {
   background: #f4f6fb;
 }
 
-button, input, textarea {
+button,
+input,
+textarea,
+select {
   font: inherit;
 }
 
 button {
   cursor: pointer;
+  transition: .2s ease;
 }
 
 .loading-screen {
@@ -30,6 +35,8 @@ button {
   font-weight: 700;
   color: #2446a8;
 }
+
+/* CONNEXION */
 
 .auth-page {
   min-height: 100vh;
@@ -68,39 +75,56 @@ button {
   display: grid;
   place-items: center;
   background: #e9efff;
-  color: #3158ca;
+  color: #3158ce;
   font-weight: 800;
 }
 
-.auth-card label,
-.data-form label {
+/* CHAMPS */
+
+label {
   display: block;
   margin: 16px 0 7px;
   font-weight: 600;
   font-size: 14px;
+  color: #34415a;
 }
 
-input, textarea {
+input,
+textarea,
+select {
   width: 100%;
-  padding: 14px 15px;
+  min-height: 48px;
+  padding: 12px 14px;
   border: 1px solid #dce2ed;
   border-radius: 11px;
   outline: none;
-  background: white;
+  background: #fff;
   color: #17233b;
+  font-size: 15px;
 }
 
-input:focus, textarea:focus {
+input:focus,
+textarea:focus,
+select:focus {
   border-color: #4168dc;
   box-shadow: 0 0 0 3px #4168dc18;
 }
 
+select {
+  cursor: pointer;
+}
+
 textarea {
-  min-height: 100px;
+  min-height: 110px;
   resize: vertical;
 }
 
-.primary, .secondary, .logout {
+/* BOUTONS */
+
+.primary,
+.secondary,
+.logout,
+.danger-button {
   border: 0;
   border-radius: 11px;
   padding: 13px 18px;
@@ -114,6 +138,7 @@ textarea {
 
 .primary:hover {
   background: #2446ae;
+  transform: translateY(-1px);
 }
 
 .primary:disabled {
@@ -121,14 +146,27 @@ textarea {
   cursor: wait;
 }
 
-.auth-card .primary {
-  width: 100%;
-  margin-top: 22px;
-}
-
 .secondary {
   background: #edf1fb;
   color: #294a9c;
+}
+
+.secondary:hover {
+  background: #dfe7fa;
+}
+
+.danger-button {
+  background: #fff0f0;
+  color: #c03939;
+}
+
+.danger-button:hover {
+  background: #ffe0e0;
+}
+
+.auth-card .primary {
+  width: 100%;
+  margin-top: 22px;
 }
 
 .text-button {
@@ -139,6 +177,8 @@ textarea {
   color: #3158ce;
   font-weight: 600;
 }
+
+/* STRUCTURE */
 
 .app-layout {
   min-height: 100vh;
@@ -163,7 +203,8 @@ textarea {
   padding: 5px 4px 28px;
 }
 
-.brand strong, .brand small {
+.brand strong,
+.brand small {
   display: block;
 }
 
@@ -186,7 +227,8 @@ textarea {
   background: transparent;
 }
 
-.nav-item:hover, .nav-item.selected {
+.nav-item:hover,
+.nav-item.selected {
   background: #2b4fa8;
   color: white;
 }
@@ -204,6 +246,10 @@ textarea {
 .logout {
   background: #263651;
   color: white;
+}
+
+.logout:hover {
+  background: #354b70;
 }
 
 .main {
@@ -242,6 +288,8 @@ textarea {
   font-weight: 800;
 }
 
+/* ACCUEIL */
+
 .hero {
   padding: 32px;
   border-radius: 20px;
@@ -273,7 +321,8 @@ textarea {
   margin-bottom: 22px;
 }
 
-.stat, .panel {
+.stat,
+.panel {
   background: white;
   border: 1px solid #e8ecf4;
   border-radius: 17px;
@@ -299,11 +348,14 @@ textarea {
   margin: 0 0 18px;
 }
 
-.quick-actions, .record-actions {
+.quick-actions,
+.record-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
+
+/* FORMULAIRES */
 
 .data-form {
   max-width: 650px;
@@ -312,7 +364,8 @@ textarea {
   margin-bottom: 30px;
 }
 
-.data-form .primary, .data-form .secondary {
+.data-form .primary,
+.data-form .secondary {
   margin-top: 14px;
 }
 
@@ -321,6 +374,8 @@ textarea {
   padding-top: 24px;
   margin-top: 30px !important;
 }
+
+/* PRODUITS ET CLIENTS */
 
 .record {
   display: flex;
@@ -352,6 +407,59 @@ textarea {
   color: #c03939;
 }
 
+/* COMMANDES */
+
+.order-line {
+  background: #f8faff;
+  border: 1px solid #e7ecf6;
+  border-radius: 14px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.order-line label:first-child {
+  margin-top: 0;
+}
+
+.order-line .danger-button {
+  margin-top: 12px;
+}
+
+.order-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  margin: 18px 0;
+  border-radius: 13px;
+  background: #edf2ff;
+  color: #294a9c;
+}
+
+.order-total span {
+  font-weight: 600;
+}
+
+.order-total strong {
+  font-size: 20px;
+  color: #19366f;
+  text-align: right;
+}
+
+.order-details {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f7f9fd;
+  border-radius: 10px;
+}
+
+.order-details strong {
+  color: #34415a;
+}
+
+/* ALERTES */
+
 .alert {
   padding: 13px 16px;
   border-radius: 10px;
@@ -370,6 +478,8 @@ textarea {
   background: #eaf8f0;
   border: 1px solid #c9eed9;
 }
+
+/* TABLETTE ET MOBILE */
 
 @media (max-width: 850px) {
   .sidebar {
@@ -449,6 +559,27 @@ textarea {
   }
 
   .record-actions {
+    width: 100%;
+  }
+
+  .record-actions button {
+    flex: 1;
+  }
+
+  .order-total {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .order-total strong {
+    text-align: left;
+  }
+
+  .quick-actions button {
+    width: 100%;
+  }
+
+  .data-form {
     width: 100%;
   }
 }
