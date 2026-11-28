@@ -755,3 +755,241 @@ export default function App() {
 
               <button className="primary" disabled={busy}>
                 
+                {busy
+                  ? "Enregistrement..."
+                  : editClient
+                    ? "Enregistrer les modifications"
+                    : "Ajouter le client"}
+              </button>
+
+              {editClient && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={viderClient}
+                >
+                  Annuler
+                </button>
+              )}
+            </form>
+
+            <h2 className="section-title">Liste des clients</h2>
+
+            {clients.map(c => (
+              <article className="record" key={c.id}>
+                <div>
+                  <strong>{c.nom_complet}</strong>
+                  <p>{c.telephone || "Aucun téléphone"}</p>
+                  <p>{c.email || "Aucun courriel"}</p>
+                </div>
+
+                <div className="record-actions">
+                  <button onClick={() => modifierClient(c)}>
+                    Modifier
+                  </button>
+                  <button
+                    className="danger-button"
+                    onClick={() => supprimerClient(c.id)}
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </article>
+            ))}
+
+            {clients.length === 0 && (
+              <p className="muted">Aucun client enregistré.</p>
+            )}
+          </section>
+        )}
+
+        {page === "commandes" && (
+          <>
+            <section className="panel">
+              <h2>Créer une commande</h2>
+
+              <form className="data-form" onSubmit={enregistrerCommande}>
+                <label>Choisir un client</label>
+                <select
+                  required
+                  value={clientCommande}
+                  onChange={e => setClientCommande(e.target.value)}
+                >
+                  <option value="">Sélectionner un client</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.nom_complet}
+                    </option>
+                  ))}
+                </select>
+
+                <h3>Produits de la commande</h3>
+
+                {lignes.map((ligne, index) => (
+                  <div className="order-line" key={index}>
+                    <label>Produit</label>
+                    <select
+                      required
+                      value={ligne.produit_id}
+                      onChange={e =>
+                        modifierLigne(
+                          index,
+                          "produit_id",
+                          e.target.value
+                        )
+                      }
+                    >
+                      <option value="">Choisir un produit</option>
+                      {produits.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.nom} — {monnaie(p.prix)} — Stock : {p.quantite_stock}
+                        </option>
+                      ))}
+                    </select>
+
+                    <label>Quantité</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={ligne.quantite}
+                      onChange={e =>
+                        modifierLigne(
+                          index,
+                          "quantite",
+                          e.target.value
+                        )
+                      }
+                    />
+
+                    <button
+                      type="button"
+                      className="danger-button"
+                      onClick={() => supprimerLigne(index)}
+                    >
+                      Retirer ce produit
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={ajouterLigne}
+                >
+                  + Ajouter un autre produit
+                </button>
+
+                <div className="order-total">
+                  <span>Total de la commande</span>
+                  <strong>{monnaie(totalCommande)}</strong>
+                </div>
+
+                <label>Mode de paiement</label>
+                <select
+                  value={modePaiement}
+                  onChange={e => setModePaiement(e.target.value)}
+                >
+                  <option value="">Choisir un mode de paiement</option>
+                  <option value="Espèces">Espèces</option>
+                  <option value="Mobile Money">Mobile Money</option>
+                  <option value="Carte bancaire">Carte bancaire</option>
+                  <option value="Virement bancaire">Virement bancaire</option>
+                  <option value="Autre">Autre</option>
+                </select>
+
+                <label>Notes sur la commande</label>
+                <textarea
+                  value={notesCommande}
+                  onChange={e => setNotesCommande(e.target.value)}
+                  placeholder="Informations supplémentaires..."
+                />
+
+                <button
+                  className="primary"
+                  disabled={busy || produits.length === 0 || clients.length === 0}
+                >
+                  {busy ? "Enregistrement..." : "Enregistrer la commande"}
+                </button>
+              </form>
+            </section>
+
+            <section className="panel">
+              <h2>Historique des commandes</h2>
+
+              {commandes.map(c => {
+                const articlesCommande = articles.filter(
+                  a => a.commande_id === c.id
+                );
+
+                return (
+                  <article className="record" key={c.id}>
+                    <div>
+                      <strong>{nomDuClient(c.client_id)}</strong>
+                      <p>
+                        Date : {c.date_commande
+                          ? new Date(c.date_commande).toLocaleDateString("fr-FR")
+                          : "Non renseignée"}
+                      </p>
+                      <p>
+                        Statut : {c.statut || "Enregistrée"}
+                      </p>
+                      <p>
+                        Total : {monnaie(c.montant_total)}
+                      </p>
+
+                      <div className="order-details">
+                        <strong>Articles :</strong>
+                        {articlesCommande.map(a => (
+                          <p key={a.id}>
+                            {nomDuProduit(a.produit_id)} × {a.quantite}
+                            {" — "}
+                            {monnaie(
+                              Number(a.prix_unitaire) * Number(a.quantite)
+                            )}
+                          </p>
+                        ))}
+                      </div>
+
+                      <p>
+                        Paiement : {c.mode_paiement || "Non précisé"}
+                      </p>
+                    </div>
+                  </article>
+                );
+              })}
+
+              {commandes.length === 0 && (
+                <p className="muted">Aucune commande enregistrée.</p>
+              )}
+            </section>
+          </>
+        )}
+
+        {page === "ventes" && (
+          <section className="panel">
+            <h2>Gestion des ventes</h2>
+            <p className="muted">
+              Cette section permettra de suivre les ventes réalisées,
+              les montants encaissés et les performances commerciales.
+            </p>
+            <p>
+              Les commandes enregistrées sont disponibles dans la section
+              Commandes.
+            </p>
+          </section>
+        )}
+
+        {page === "factures" && (
+          <section className="panel">
+            <h2>Gestion des factures</h2>
+            <p className="muted">
+              Cette section accueillera la création et le suivi des factures
+              de vos clients.
+            </p>
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
